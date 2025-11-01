@@ -1,15 +1,15 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   compiler: {
     emotion: true,
   },
   modularizeImports: {
-    "@mui/material": {
-      transform: "@mui/material/{{member}}",
+    '@mui/material': {
+      transform: '@mui/material/{{member}}',
     },
-    "@mui/icons-material": {
-      transform: "@mui/icons-material/{{member}}",
+    '@mui/icons-material': {
+      transform: '@mui/icons-material/{{member}}',
     },
   },
 };

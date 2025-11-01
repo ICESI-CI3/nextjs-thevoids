@@ -1,14 +1,8 @@
-"use client";
+'use client';
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from "react";
+import { createContext, useContext, useState, ReactNode } from 'react';
 
-type ThemeMode = "light" | "dark";
+type ThemeMode = 'light' | 'dark';
 
 interface ThemeContextType {
   mode: ThemeMode;
@@ -18,19 +12,21 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeContextProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<ThemeMode>("light");
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as ThemeMode;
-    if (savedTheme && (savedTheme === "light" || savedTheme === "dark")) {
-      setMode(savedTheme);
+  const [mode, setMode] = useState<ThemeMode>(() => {
+    // Inicializar con el tema guardado o 'light' por defecto
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('theme') as ThemeMode;
+      if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
+        return savedTheme;
+      }
     }
-  }, []);
+    return 'light';
+  });
 
   const toggleTheme = () => {
-    const newMode = mode === "light" ? "dark" : "light";
+    const newMode = mode === 'light' ? 'dark' : 'light';
     setMode(newMode);
-    localStorage.setItem("theme", newMode);
+    localStorage.setItem('theme', newMode);
   };
 
   return (
@@ -43,7 +39,7 @@ export function ThemeContextProvider({ children }: { children: ReactNode }) {
 export function useThemeContext() {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    throw new Error("useThemeContext must be used within ThemeContextProvider");
+    throw new Error('useThemeContext must be used within ThemeContextProvider');
   }
   return context;
 }
