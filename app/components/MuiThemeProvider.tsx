@@ -2,7 +2,6 @@
 
 import { StyledEngineProvider } from '@mui/material/styles';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
 import { ReactNode, useMemo } from 'react';
 import { useThemeContext } from './ThemeContext';
 
@@ -88,10 +87,7 @@ export default function MuiThemeProvider({ children }: MuiThemeProviderProps) {
 
   return (
     <StyledEngineProvider injectFirst>
-      <ThemeProvider theme={theme}>
-        <CssBaseline enableColorScheme />
-        {children}
-      </ThemeProvider>
+      <ThemeProvider theme={theme}>{children}</ThemeProvider>
     </StyledEngineProvider>
   );
 }

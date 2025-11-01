@@ -30,4 +30,17 @@ html,
 body {
   height: 100%;
   width: 100%;
+  background-color: var(--background);
+  color: var(--foreground);
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* Estilos para el contenido principal */
+.main-content {
+  flex-grow: 1;
+  padding: 32px;
+  background-color: var(--background);
+  color: var(--foreground);
 }
