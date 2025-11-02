@@ -38,14 +38,11 @@ const eslintConfig = defineConfig([
       'no-console': 'warn',
     },
   },
-  // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
     '.next/**',
     'out/**',
     'build/**',
     'next-env.d.ts',
-    // Additional ignores
     'node_modules/**',
     '.husky/**',
     '*.config.js',

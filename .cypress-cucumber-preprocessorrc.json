@@ -1,0 +1,8 @@
+{
+  "stepDefinitions": [
+    "tests/e2e/**/*.ts",
+    "tests/e2e/step_definitions/**/*.ts"
+  ],
+  "filterSpecs": true,
+  "omitFiltered": true
+}
