@@ -12,6 +12,7 @@ import {
   Typography,
   Box,
   Divider,
+  Button,
 } from '@mui/material';
 import {
   CheckCircleOutline,
@@ -23,10 +24,11 @@ import {
   AdminPanelSettings,
   Badge,
   Receipt,
-  PersonAdd,
   Person,
+  Logout,
 } from '@mui/icons-material';
 import { useThemeContext } from './ThemeContext';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 export const navItems = [
   { href: '/habits', label: 'Hábitos', icon: CheckCircleOutline },
@@ -42,14 +44,18 @@ export const navItems = [
   },
   { href: '/roles', label: 'Roles', icon: Badge },
   { href: '/transactions', label: 'Transacciones', icon: Receipt },
-  { href: '/userRoles', label: 'Roles de Usuario', icon: PersonAdd },
   { href: '/users', label: 'Usuarios', icon: Person },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
   const { mode } = useThemeContext();
+  const { user, logout, isAuthenticated } = useAuth();
   const isDark = mode === 'dark';
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <Drawer
@@ -91,6 +97,20 @@ export default function Navbar() {
           </Typography>
         </Box>
         <Divider sx={{ mx: 2, borderColor: isDark ? '#2a2a2a' : '#d1fae5' }} />
+        {user && (
+          <Box sx={{ px: 2, py: 2 }}>
+            <Typography
+              variant="body2"
+              sx={{ color: 'text.secondary', mb: 0.5 }}
+            >
+              {user.name}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              {user.role}
+            </Typography>
+          </Box>
+        )}
+        <Divider sx={{ mx: 2, borderColor: isDark ? '#2a2a2a' : '#d1fae5' }} />
         <List sx={{ px: 1, py: 2 }}>
           {navItems.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href;
@@ -130,6 +150,18 @@ export default function Navbar() {
             );
           })}
         </List>
+        <Box sx={{ px: 2, pb: 2 }}>
+          <Button
+            fullWidth
+            variant="outlined"
+            color="error"
+            startIcon={<Logout />}
+            onClick={logout}
+            sx={{ mt: 2 }}
+          >
+            Cerrar Sesión
+          </Button>
+        </Box>
       </Box>
     </Drawer>
   );
