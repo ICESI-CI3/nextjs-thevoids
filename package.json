@@ -16,7 +16,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:e2e": "cypress open",
-    "test:e2e:headless": "start-server-and-test dev http://localhost:5173 cypress:run"
+    "test:e2e:headless": "start-server-and-test dev http://localhost:5173 cypress:run",
+    "cypress:run": "cypress run"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
