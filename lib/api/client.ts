@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5173';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 export interface ApiResponse<T> {
   data?: T;
@@ -16,7 +16,6 @@ export class ApiClient {
   private getAuthHeaders(): HeadersInit {
     const token = this.getToken();
     return {
-      'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
     };
   }
@@ -33,12 +32,27 @@ export class ApiClient {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
+      const isFormData = options.body instanceof FormData;
+
+      const headers = new Headers({
+        'Content-Type': 'application/json',
+        ...this.getAuthHeaders(),
+      });
+
+      if (options.headers) {
+        const extraHeaders = new Headers(options.headers as HeadersInit);
+        extraHeaders.forEach((value, key) => {
+          headers.set(key, value);
+        });
+      }
+
+      if (isFormData) {
+        headers.delete('Content-Type');
+      }
+
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
-        headers: {
-          ...this.getAuthHeaders(),
-          ...options.headers,
-        },
+        headers,
       });
 
       const status = response.status;
@@ -47,7 +61,10 @@ export class ApiClient {
         return { status, data: undefined };
       }
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      const data = contentType.includes('application/json')
+        ? await response.json()
+        : undefined;
 
       if (!response.ok) {
         // Manejo específico de errores HTTP comunes

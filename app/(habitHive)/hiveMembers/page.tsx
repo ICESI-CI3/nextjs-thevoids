@@ -167,7 +167,10 @@ export default function HiveMembers() {
     if (!memberToDelete) return;
     setError('');
     setSuccess('');
-    const response = await hiveMembersApi.delete(memberToDelete.id);
+    const response = await hiveMembersApi.delete(
+      memberToDelete.hiveId,
+      memberToDelete.userId
+    );
     if (response.error) {
       setError(response.error);
     } else {

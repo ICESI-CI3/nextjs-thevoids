@@ -33,6 +33,7 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
+  FormHelperText,
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import {
@@ -54,6 +55,7 @@ import {
   Lock,
 } from '@mui/icons-material';
 import { hivesApi, Hive, CreateHiveDto, HiveStatus } from '@/lib/api/hives';
+import { habitHivesApi } from '@/lib/api/habitHives';
 import { hiveMembersApi, MemberRole } from '@/lib/api/hiveMembers';
 import { HabitType, Habit, habitsApi } from '@/lib/api/habits';
 import { useAuth } from '@/lib/contexts/AuthContext';
@@ -86,6 +88,7 @@ export default function Hives() {
     ],
     isPublic: true,
   });
+  const [selectedHabitIds, setSelectedHabitIds] = useState<string[]>([]);
 
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const router = useRouter();
@@ -167,6 +170,9 @@ export default function Hives() {
         allowedHabitTypes: hive.allowedHabitTypes,
         isPublic: hive.isPublic,
       });
+      setSelectedHabitIds(
+        hive.habitHives?.map(habitHive => habitHive.habitId) || []
+      );
     } else {
       setEditingHive(null);
       setFormData({
@@ -182,6 +188,7 @@ export default function Hives() {
         ],
         isPublic: true,
       });
+      setSelectedHabitIds([]);
     }
     setOpenDialog(true);
   };
@@ -189,6 +196,7 @@ export default function Hives() {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingHive(null);
+    setSelectedHabitIds([]);
   };
 
   const handleSubmit = async () => {
@@ -205,11 +213,47 @@ export default function Hives() {
         loadHives();
       }
     } else {
-      const response = await hivesApi.create(formData);
+      if (!user?.id) {
+        setError('No se pudo identificar al usuario actual');
+        return;
+      }
+
+      const response = await hivesApi.create({
+        ...formData,
+        createdById: user.id,
+      });
       if (response.error) {
         setError(response.error);
       } else {
-        setSuccess('Colmena creada correctamente');
+        const createdHive = response.data;
+        let assignmentError = '';
+        if (selectedHabitIds.length && createdHive) {
+          const assignments = await Promise.all(
+            selectedHabitIds.map(habitId =>
+              habitHivesApi.create({
+                hiveId: createdHive.id,
+                habitId,
+              })
+            )
+          );
+
+          const failedAssignments = assignments.filter(result => result.error);
+          if (failedAssignments.length) {
+            assignmentError = failedAssignments
+              .map(result => result.error)
+              .filter(Boolean)
+              .join('. ');
+          }
+        }
+
+        if (assignmentError) {
+          setError(
+            `La colmena se creó, pero hubo problemas al asociar algunos hábitos: ${assignmentError}`
+          );
+        } else {
+          setSuccess('Colmena creada y hábitos asociados correctamente');
+        }
+
         handleCloseDialog();
         loadHives();
       }
@@ -810,6 +854,43 @@ export default function Hives() {
             label="Colmena pública"
             sx={{ mt: 2 }}
           />
+          <FormControl fullWidth sx={{ mt: 2 }} disabled={Boolean(editingHive)}>
+            <InputLabel>Hábitos iniciales</InputLabel>
+            <Select
+              multiple
+              value={selectedHabitIds}
+              label="Hábitos iniciales"
+              onChange={event => {
+                const value = event.target.value;
+                setSelectedHabitIds(
+                  typeof value === 'string'
+                    ? value.split(',')
+                    : (value as string[])
+                );
+              }}
+              renderValue={selected => {
+                const selectedIds = Array.isArray(selected)
+                  ? (selected as string[])
+                  : [];
+                return habits
+                  .filter(habit => selectedIds.includes(habit.id))
+                  .map(habit => habit.title)
+                  .join(', ');
+              }}
+            >
+              {habits.map(habit => (
+                <MenuItem key={habit.id} value={habit.id}>
+                  <Checkbox checked={selectedHabitIds.includes(habit.id)} />
+                  <ListItemText primary={habit.title} />
+                </MenuItem>
+              ))}
+            </Select>
+            <FormHelperText>
+              {editingHive
+                ? 'La asociación de hábitos existentes se gestiona por separado'
+                : 'Selecciona los hábitos que esta colmena tendrá disponibles desde el inicio'}
+            </FormHelperText>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancelar</Button>

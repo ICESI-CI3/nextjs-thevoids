@@ -68,6 +68,10 @@ export const hiveMembersApi = {
     return apiClient.get<HiveMember[]>(`/hive-members/hive/${hiveId}`);
   },
 
+  getByUser: async (userId: string) => {
+    return apiClient.get<HiveMember[]>(`/hive-members/user/${userId}`);
+  },
+
   create: async (data: CreateHiveMemberDto) => {
     return apiClient.post<HiveMember>('/hive-members', data);
   },
@@ -76,7 +80,7 @@ export const hiveMembersApi = {
     return apiClient.patch<HiveMember>(`/hive-members/${id}`, data);
   },
 
-  delete: async (id: string) => {
-    return apiClient.delete(`/hive-members/${id}`);
+  delete: async (hiveId: string, userId: string) => {
+    return apiClient.delete(`/hive-members/${hiveId}/${userId}`);
   },
 };

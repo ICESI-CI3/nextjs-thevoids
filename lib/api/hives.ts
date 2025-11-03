@@ -78,6 +78,7 @@ export interface CreateHiveDto {
   eliminationType?: string;
   allowedHabitTypes?: HabitType[];
   isPublic?: boolean;
+  createdById?: string;
 }
 
 export interface UpdateHiveDto {

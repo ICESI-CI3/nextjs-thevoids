@@ -18,6 +18,10 @@ import {
   LinearProgress,
   Tabs,
   Tab,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   Refresh,
@@ -63,6 +67,11 @@ export default function MyHives() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [tabValue, setTabValue] = useState(0);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [membershipToLeave, setMembershipToLeave] = useState<{
+    membership: HiveMember;
+    hive: Hive;
+  } | null>(null);
 
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const router = useRouter();
@@ -78,7 +87,7 @@ export default function MyHives() {
     setCurrentTime(Date.now()); // Update current time when loading data
 
     // Obtener mis membresías
-    const membersResponse = await hiveMembersApi.getAll();
+    const membersResponse = await hiveMembersApi.getByUser(user.id);
     if (membersResponse.error) {
       setError(membersResponse.error);
       setIsLoading(false);
@@ -86,8 +95,7 @@ export default function MyHives() {
     }
 
     // Filtrar solo mis membresías
-    const myMembershipsData =
-      membersResponse.data?.filter(m => m.userId === user.id) || [];
+    const myMembershipsData = membersResponse.data || [];
     setMyMemberships(myMembershipsData);
 
     // Obtener detalles de cada colmena
@@ -116,19 +124,32 @@ export default function MyHives() {
     return () => clearTimeout(timer);
   }, [isAuthenticated, authLoading, loadMyHives, router]);
 
-  const handleLeaveHive = async (membershipId: string, hiveName: string) => {
-    if (!confirm(`¿Estás seguro de abandonar "${hiveName}"?`)) return;
+  const handleLeaveHive = async () => {
+    if (!membershipToLeave) return;
+
+    const {
+      membership: { hiveId, userId },
+      hive,
+    } = membershipToLeave;
 
     setError('');
     setSuccess('');
 
-    const response = await hiveMembersApi.delete(membershipId);
+    const response = await hiveMembersApi.delete(hiveId, userId);
     if (response.error) {
       setError(response.error);
     } else {
-      setSuccess(`Has abandonado "${hiveName}"`);
+      setSuccess(`Has abandonado "${hive.name}"`);
       loadMyHives();
     }
+
+    setMembershipToLeave(null);
+    setLeaveDialogOpen(false);
+  };
+
+  const promptLeaveHive = (membership: HiveMember, hive: Hive) => {
+    setMembershipToLeave({ membership, hive });
+    setLeaveDialogOpen(true);
   };
 
   const activeMemberships = myMemberships.filter(
@@ -352,7 +373,7 @@ export default function MyHives() {
                 size="small"
                 color="error"
                 startIcon={<ExitToApp />}
-                onClick={() => handleLeaveHive(membership.id, hive.name)}
+                onClick={() => promptLeaveHive(membership, hive)}
               >
                 Abandonar
               </Button>
@@ -523,6 +544,38 @@ export default function MyHives() {
           </TabPanel>
         </>
       )}
+
+      <Dialog
+        open={leaveDialogOpen}
+        onClose={() => {
+          setLeaveDialogOpen(false);
+          setMembershipToLeave(null);
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Confirmar salida</DialogTitle>
+        <DialogContent>
+          <Typography>
+            {membershipToLeave
+              ? `¿Estás seguro de abandonar "${membershipToLeave.hive.name}"?`
+              : '¿Estás seguro de abandonar esta colmena?'}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setLeaveDialogOpen(false);
+              setMembershipToLeave(null);
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button color="error" variant="contained" onClick={handleLeaveHive}>
+            Abandonar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

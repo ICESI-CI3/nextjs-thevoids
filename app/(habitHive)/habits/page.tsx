@@ -67,7 +67,7 @@ export default function Habits() {
     evidenceType: EvidenceType.PHOTO,
   });
 
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const router = useRouter();
 
   const loadHabits = useCallback(async () => {
@@ -127,6 +127,7 @@ export default function Habits() {
         type: habit.type,
         frequency: habit.frequency || 'daily',
         evidenceType: habit.evidenceType,
+        userId: habit.userId,
       });
     } else {
       setEditingHabit(null);
@@ -149,8 +150,15 @@ export default function Habits() {
     setError('');
     setSuccess('');
 
+    if (!user) {
+      setError('Debes iniciar sesión para gestionar hábitos');
+      router.push('/login');
+      return;
+    }
+
     if (editingHabit) {
-      const response = await habitsApi.update(editingHabit.id, formData);
+      const { ...updateData } = formData;
+      const response = await habitsApi.update(editingHabit.id, updateData);
       if (response.error) {
         setError(response.error);
       } else {
@@ -159,7 +167,10 @@ export default function Habits() {
         loadHabits();
       }
     } else {
-      const response = await habitsApi.create(formData);
+      const response = await habitsApi.create({
+        ...formData,
+        userId: user.id,
+      });
       if (response.error) {
         setError(response.error);
       } else {

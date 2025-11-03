@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5173';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 export enum ProgressStatus {
   COMPLETED = 'completed',
@@ -14,6 +14,10 @@ export interface Progress {
   date: string;
   status: ProgressStatus;
   verifiedBy?: string;
+  evidenceUrl?: string;
+  evidenceNotes?: string;
+  witnessName?: string;
+  witnessContact?: string;
   createdAt: string;
   updatedAt: string;
   user?: {
@@ -43,11 +47,19 @@ export interface CreateProgressDto {
   habitId: string;
   date: string;
   status?: ProgressStatus;
+  verifiedBy?: string;
+  evidenceNotes?: string;
+  witnessName?: string;
+  witnessContact?: string;
+  evidenceFile?: File;
 }
 
 export interface UpdateProgressDto {
   status?: ProgressStatus;
   verifiedBy?: string;
+  evidenceNotes?: string;
+  witnessName?: string;
+  witnessContact?: string;
 }
 
 export interface ProgressStats {
@@ -56,6 +68,9 @@ export interface ProgressStats {
   failed: number;
   pending: number;
   completionRate: number;
+  userId?: string;
+  hiveId?: string;
+  habitId?: string;
 }
 
 export interface ApiResponse<T> {
@@ -70,11 +85,22 @@ class ProgressApi {
   ): Promise<ApiResponse<T>> {
     try {
       const token = localStorage.getItem('token');
-      const headers: HeadersInit = {
+      const isFormData = options?.body instanceof FormData;
+
+      const headers = new Headers({
         'Content-Type': 'application/json',
+        Accept: 'application/json',
         ...(token && { Authorization: `Bearer ${token}` }),
-        ...options?.headers,
-      };
+      });
+
+      if (options?.headers) {
+        const extraHeaders = new Headers(options.headers as HeadersInit);
+        extraHeaders.forEach((value, key) => headers.set(key, value));
+      }
+
+      if (isFormData) {
+        headers.delete('Content-Type');
+      }
 
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
@@ -88,8 +114,17 @@ class ProgressApi {
         };
       }
 
-      const data = await response.json();
-      return { data };
+      if (response.status === 204) {
+        return { data: undefined };
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = (await response.json()) as T;
+        return { data };
+      }
+
+      return { data: undefined };
     } catch (error) {
       return {
         error: error instanceof Error ? error.message : 'An error occurred',
@@ -99,12 +134,12 @@ class ProgressApi {
 
   async getAll(limit = 50, offset = 0): Promise<ApiResponse<Progress[]>> {
     return this.request<Progress[]>(
-      `/progress?limit=${limit}&offset=${offset}`
+      `/progresses?limit=${limit}&offset=${offset}`
     );
   }
 
   async getById(id: string): Promise<ApiResponse<Progress>> {
-    return this.request<Progress>(`/progress/${id}`);
+    return this.request<Progress>(`/progresses/${id}`);
   }
 
   async getByUser(
@@ -113,7 +148,7 @@ class ProgressApi {
     offset = 0
   ): Promise<ApiResponse<Progress[]>> {
     return this.request<Progress[]>(
-      `/progress/user/${userId}?limit=${limit}&offset=${offset}`
+      `/progresses/user/${userId}?limit=${limit}&offset=${offset}`
     );
   }
 
@@ -123,7 +158,7 @@ class ProgressApi {
     offset = 0
   ): Promise<ApiResponse<Progress[]>> {
     return this.request<Progress[]>(
-      `/progress/hive/${hiveId}?limit=${limit}&offset=${offset}`
+      `/progresses/hive/${hiveId}?limit=${limit}&offset=${offset}`
     );
   }
 
@@ -133,7 +168,7 @@ class ProgressApi {
     offset = 0
   ): Promise<ApiResponse<Progress[]>> {
     return this.request<Progress[]>(
-      `/progress/habit/${habitId}?limit=${limit}&offset=${offset}`
+      `/progresses/habit/${habitId}?limit=${limit}&offset=${offset}`
     );
   }
 
@@ -144,16 +179,16 @@ class ProgressApi {
     offset = 0
   ): Promise<ApiResponse<Progress[]>> {
     return this.request<Progress[]>(
-      `/progress/user/${userId}/hive/${hiveId}?limit=${limit}&offset=${offset}`
+      `/progresses/user/${userId}/hive/${hiveId}?limit=${limit}&offset=${offset}`
     );
   }
 
   async getUserStats(userId: string): Promise<ApiResponse<ProgressStats>> {
-    return this.request<ProgressStats>(`/progress/user/${userId}/stats`);
+    return this.request<ProgressStats>(`/progresses/stats/user/${userId}`);
   }
 
   async getHiveStats(hiveId: string): Promise<ApiResponse<ProgressStats>> {
-    return this.request<ProgressStats>(`/progress/hive/${hiveId}/stats`);
+    return this.request<ProgressStats>(`/progresses/stats/hive/${hiveId}`);
   }
 
   async getTodayByUser(
@@ -162,7 +197,7 @@ class ProgressApi {
     offset = 0
   ): Promise<ApiResponse<Progress[]>> {
     return this.request<Progress[]>(
-      `/progress/user/${userId}/today?limit=${limit}&offset=${offset}`
+      `/progresses/today/user/${userId}?limit=${limit}&offset=${offset}`
     );
   }
 
@@ -171,16 +206,34 @@ class ProgressApi {
     habitId: string
   ): Promise<ApiResponse<number>> {
     return this.request<number>(
-      `/progress/user/${userId}/habit/${habitId}/streak`
+      `/progresses/streak/user/${userId}/habit/${habitId}`
     );
   }
 
   async create(
     createProgressDto: CreateProgressDto
   ): Promise<ApiResponse<Progress>> {
-    return this.request<Progress>('/progress', {
+    const { evidenceFile, ...rest } = createProgressDto;
+
+    if (evidenceFile) {
+      const formData = new FormData();
+
+      Object.entries(rest).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        formData.append(key, String(value));
+      });
+
+      formData.append('evidence', evidenceFile);
+
+      return this.request<Progress>('/progresses', {
+        method: 'POST',
+        body: formData,
+      });
+    }
+
+    return this.request<Progress>('/progresses', {
       method: 'POST',
-      body: JSON.stringify(createProgressDto),
+      body: JSON.stringify(rest),
     });
   }
 
@@ -188,7 +241,7 @@ class ProgressApi {
     id: string,
     updateProgressDto: UpdateProgressDto
   ): Promise<ApiResponse<Progress>> {
-    return this.request<Progress>(`/progress/${id}`, {
+    return this.request<Progress>(`/progresses/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(updateProgressDto),
     });
@@ -198,21 +251,20 @@ class ProgressApi {
     id: string,
     status: ProgressStatus
   ): Promise<ApiResponse<Progress>> {
-    return this.request<Progress>(`/progress/${id}/status`, {
+    return this.request<Progress>(`/progresses/${id}/status?status=${status}`, {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
     });
   }
 
   async verify(id: string, verifiedBy: string): Promise<ApiResponse<Progress>> {
-    return this.request<Progress>(`/progress/${id}/verify`, {
+    const query = new URLSearchParams({ verifiedBy }).toString();
+    return this.request<Progress>(`/progresses/${id}/verify?${query}`, {
       method: 'PATCH',
-      body: JSON.stringify({ verifiedBy }),
     });
   }
 
   async delete(id: string): Promise<ApiResponse<void>> {
-    return this.request<void>(`/progress/${id}`, {
+    return this.request<void>(`/progresses/${id}`, {
       method: 'DELETE',
     });
   }

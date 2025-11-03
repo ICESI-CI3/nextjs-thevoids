@@ -11,6 +11,7 @@ export interface User {
   email: string;
   role: string;
   isActive: boolean;
+  roles?: string[];
 }
 
 export interface LoginResponse {

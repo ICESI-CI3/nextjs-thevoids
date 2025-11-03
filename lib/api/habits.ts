@@ -35,6 +35,7 @@ export interface CreateHabitDto {
   type: HabitType;
   frequency?: string;
   evidenceType: EvidenceType;
+  userId?: string;
 }
 
 export interface UpdateHabitDto {

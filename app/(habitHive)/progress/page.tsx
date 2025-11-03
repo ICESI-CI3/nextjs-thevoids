@@ -21,6 +21,7 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  FormHelperText,
 } from '@mui/material';
 import Grid from '@mui/material/Grid';
 import {
@@ -31,6 +32,7 @@ import {
   LocalFireDepartment,
   TrendingUp,
   CalendarToday,
+  AttachFile,
 } from '@mui/icons-material';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import {
@@ -40,12 +42,30 @@ import {
   ProgressStats,
 } from '@/lib/api/progress';
 import { hivesApi, Hive } from '@/lib/api/hives';
-import { habitsApi, Habit } from '@/lib/api/habits';
+import { habitsApi, Habit, EvidenceType } from '@/lib/api/habits';
+import { hiveMembersApi, MemberStatus } from '@/lib/api/hiveMembers';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
+const resolveEvidenceUrl = (url?: string) => {
+  if (!url) {
+    return '';
+  }
+
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+
+  const sanitizedBase = API_BASE_URL.replace(/\/$/, '');
+  const normalizedPath = url.startsWith('/') ? url : `/${url}`;
+  return `${sanitizedBase}${normalizedPath}`;
+};
 
 export default function ProgressPage() {
   const [myProgress, setMyProgress] = useState<Progress[]>([]);
   const [myHives, setMyHives] = useState<Hive[]>([]);
   const [myHabits, setMyHabits] = useState<Map<string, Habit>>(new Map());
+  const [habitsByHive, setHabitsByHive] = useState<Record<string, Habit[]>>({});
   const [stats, setStats] = useState<ProgressStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -58,7 +78,11 @@ export default function ProgressPage() {
     habitId: '',
     date: new Date().toISOString().split('T')[0],
     status: ProgressStatus.COMPLETED,
+    evidenceNotes: '',
+    witnessName: '',
+    witnessContact: '',
   });
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
 
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const router = useRouter();
@@ -69,49 +93,122 @@ export default function ProgressPage() {
     setIsLoading(true);
     setError('');
 
-    // Cargar progreso del usuario
-    const progressResponse = await progressApi.getByUser(user.id);
-    if (progressResponse.error) {
-      setError(progressResponse.error);
-    } else if (progressResponse.data) {
-      setMyProgress(progressResponse.data);
+    try {
+      const [progressResponse, statsResponse, membershipsResponse] =
+        await Promise.all([
+          progressApi.getByUser(user.id),
+          progressApi.getUserStats(user.id),
+          hiveMembersApi.getByUser(user.id),
+        ]);
 
-      // Extraer hives únicos
-      const uniqueHiveIds = [
-        ...new Set(progressResponse.data.map(p => p.hiveId)),
-      ];
+      if (progressResponse.error) {
+        setError(progressResponse.error);
+        setMyProgress([]);
+      } else {
+        setMyProgress(progressResponse.data ?? []);
+      }
+
+      if (statsResponse.data) {
+        setStats(statsResponse.data);
+      } else {
+        setStats(null);
+      }
+
+      if (membershipsResponse.error) {
+        setError(prev => prev || membershipsResponse.error!);
+      }
+
+      const progressData = progressResponse.data ?? [];
+      const activeMemberships =
+        membershipsResponse.data?.filter(
+          membership => membership.status === MemberStatus.ACTIVE
+        ) ?? [];
+
+      const hiveIds = new Set<string>();
+      activeMemberships.forEach(membership => hiveIds.add(membership.hiveId));
+      progressData.forEach(progress => hiveIds.add(progress.hiveId));
+
+      const hiveResponses = await Promise.all(
+        Array.from(hiveIds).map(hiveId => hivesApi.getById(hiveId))
+      );
+
       const hivesMap = new Map<string, Hive>();
+      const habitIds = new Set<string>();
 
-      for (const hiveId of uniqueHiveIds) {
-        const hiveResponse = await hivesApi.getById(hiveId);
-        if (hiveResponse.data) {
-          hivesMap.set(hiveId, hiveResponse.data);
+      hiveResponses.forEach(response => {
+        if (response.data) {
+          hivesMap.set(response.data.id, response.data);
+          if (response.data.habitId) {
+            habitIds.add(response.data.habitId);
+          }
+          response.data.habitHives?.forEach(relation => {
+            habitIds.add(relation.habitId);
+          });
         }
-      }
-      setMyHives(Array.from(hivesMap.values()));
+      });
 
-      // Extraer hábitos únicos
-      const uniqueHabitIds = [
-        ...new Set(progressResponse.data.map(p => p.habitId)),
-      ];
+      progressData.forEach(progress => {
+        if (progress.habitId) {
+          habitIds.add(progress.habitId);
+        }
+        if (progress.habit?.id) {
+          habitIds.add(progress.habit.id);
+        }
+      });
+
+      const habitResponses = await Promise.all(
+        Array.from(habitIds).map(habitId => habitsApi.getById(habitId))
+      );
+
       const habitsMap = new Map<string, Habit>();
-
-      for (const habitId of uniqueHabitIds) {
-        const habitResponse = await habitsApi.getById(habitId);
-        if (habitResponse.data) {
-          habitsMap.set(habitId, habitResponse.data);
+      habitResponses.forEach(response => {
+        if (response.data) {
+          habitsMap.set(response.data.id, response.data);
         }
-      }
+      });
+
+      const habitsByHiveMap: Record<string, Habit[]> = {};
+      hivesMap.forEach(hive => {
+        const relatedHabits = new Set<string>();
+        if (hive.habitId) {
+          relatedHabits.add(hive.habitId);
+        }
+        hive.habitHives?.forEach(relation => {
+          relatedHabits.add(relation.habitId);
+        });
+
+        habitsByHiveMap[hive.id] = Array.from(relatedHabits)
+          .map(id => habitsMap.get(id))
+          .filter((habit): habit is Habit => Boolean(habit));
+      });
+
+      setMyHives(Array.from(hivesMap.values()));
       setMyHabits(habitsMap);
-    }
+      setHabitsByHive(habitsByHiveMap);
 
-    // Cargar estadísticas
-    const statsResponse = await progressApi.getUserStats(user.id);
-    if (statsResponse.data) {
-      setStats(statsResponse.data);
-    }
+      setFormData(prev => {
+        if (prev.hiveId) {
+          return prev;
+        }
 
-    setIsLoading(false);
+        const defaultHiveId = Array.from(hivesMap.keys())[0] ?? '';
+        const defaultHabitId = habitsByHiveMap[defaultHiveId]?.[0]?.id ?? '';
+
+        return {
+          ...prev,
+          hiveId: defaultHiveId,
+          habitId: defaultHabitId,
+        };
+      });
+    } catch (fetchError) {
+      setError(
+        fetchError instanceof Error
+          ? fetchError.message
+          : 'No se pudo cargar tu progreso'
+      );
+    } finally {
+      setIsLoading(false);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -126,27 +223,109 @@ export default function ProgressPage() {
     return () => clearTimeout(timer);
   }, [isAuthenticated, authLoading, loadMyProgress, router]);
 
+  const handleCloseCreateDialog = () => {
+    setCreateDialogOpen(false);
+    setEvidenceFile(null);
+    setFormData(prev => ({
+      ...prev,
+      evidenceNotes: '',
+      witnessName: '',
+      witnessContact: '',
+    }));
+  };
+
+  useEffect(() => {
+    setFormData(prev => {
+      if (!prev.hiveId) {
+        return prev;
+      }
+
+      const available = habitsByHive[prev.hiveId] ?? [];
+      if (available.length === 0) {
+        return prev.habitId ? { ...prev, habitId: '' } : prev;
+      }
+
+      const exists = available.some(habit => habit.id === prev.habitId);
+      if (exists) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        habitId: available[0].id,
+      };
+    });
+  }, [habitsByHive, formData.hiveId]);
+
+  useEffect(() => {
+    setEvidenceFile(null);
+    setFormData(prev => ({
+      ...prev,
+      evidenceNotes: '',
+      witnessName: '',
+      witnessContact: '',
+    }));
+  }, [formData.habitId]);
+
   const handleCreateProgress = async () => {
     if (!user) return;
 
     setError('');
     setSuccess('');
 
+    if (!formData.hiveId || !formData.habitId) {
+      setError('Selecciona una colmena y un hábito');
+      return;
+    }
+
+    if (!selectedHabitDetails) {
+      setError('El hábito seleccionado no es válido');
+      return;
+    }
+
+    if (
+      selectedHabitDetails.evidenceType === EvidenceType.PHOTO &&
+      !evidenceFile
+    ) {
+      setError('Debes adjuntar una evidencia fotográfica');
+      return;
+    }
+
+    if (
+      selectedHabitDetails.evidenceType === EvidenceType.SELF &&
+      !formData.evidenceNotes.trim()
+    ) {
+      setError('Describe tu progreso para este hábito');
+      return;
+    }
+
+    if (
+      selectedHabitDetails.evidenceType === EvidenceType.WITNESS &&
+      !formData.witnessName.trim()
+    ) {
+      setError('Indica el nombre de quien certifica tu progreso');
+      return;
+    }
+
     const response = await progressApi.create({
       ...formData,
       userId: user.id,
+      evidenceFile: evidenceFile ?? undefined,
     });
 
     if (response.error) {
       setError(response.error);
     } else {
       setSuccess('Progreso registrado exitosamente');
-      setCreateDialogOpen(false);
+      handleCloseCreateDialog();
       setFormData({
         hiveId: '',
         habitId: '',
         date: new Date().toISOString().split('T')[0],
         status: ProgressStatus.COMPLETED,
+        evidenceNotes: '',
+        witnessName: '',
+        witnessContact: '',
       });
       loadMyProgress();
     }
@@ -202,6 +381,42 @@ export default function ProgressPage() {
         return status;
     }
   };
+
+  const evidenceTypeDescriptions: Record<EvidenceType, string> = {
+    [EvidenceType.API]: 'Referencia externa',
+    [EvidenceType.PHOTO]: 'Archivo fotográfico',
+    [EvidenceType.SELF]: 'Descripción personal',
+    [EvidenceType.WITNESS]: 'Validación por un tercero',
+  };
+
+  const availableHabitsForHive =
+    formData.hiveId && habitsByHive[formData.hiveId]
+      ? habitsByHive[formData.hiveId]
+      : [];
+
+  const selectedHabitDetails = formData.habitId
+    ? myHabits.get(formData.habitId)
+    : undefined;
+
+  const evidenceMissing = (() => {
+    if (!selectedHabitDetails) return false;
+
+    switch (selectedHabitDetails.evidenceType) {
+      case EvidenceType.PHOTO:
+        return !evidenceFile;
+      case EvidenceType.SELF:
+        return !formData.evidenceNotes.trim();
+      case EvidenceType.API:
+        return !formData.evidenceNotes.trim();
+      case EvidenceType.WITNESS:
+        return !formData.witnessName.trim();
+      default:
+        return false;
+    }
+  })();
+
+  const canSubmit =
+    Boolean(formData.hiveId && formData.habitId) && !evidenceMissing;
 
   // Filtrar progreso
   const filteredProgress = myProgress.filter(progress => {
@@ -416,6 +631,42 @@ export default function ProgressPage() {
                       Fecha: {new Date(progress.date).toLocaleDateString()}
                     </Typography>
 
+                    {resolveEvidenceUrl(progress.evidenceUrl) && (
+                      <Button
+                        size="small"
+                        startIcon={<AttachFile fontSize="small" />}
+                        href={resolveEvidenceUrl(progress.evidenceUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{ mt: 1 }}
+                      >
+                        Ver evidencia
+                      </Button>
+                    )}
+
+                    {progress.evidenceNotes && (
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mt: 1 }}
+                      >
+                        Evidencia: {progress.evidenceNotes}
+                      </Typography>
+                    )}
+
+                    {progress.witnessName && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block', mt: 1 }}
+                      >
+                        Verificado por: {progress.witnessName}
+                        {progress.witnessContact
+                          ? ` (${progress.witnessContact})`
+                          : ''}
+                      </Typography>
+                    )}
+
                     {progress.verifiedBy && (
                       <Typography variant="caption" color="success.main">
                         ✓ Verificado
@@ -464,7 +715,7 @@ export default function ProgressPage() {
       {/* Create Progress Dialog */}
       <Dialog
         open={createDialogOpen}
-        onClose={() => setCreateDialogOpen(false)}
+        onClose={handleCloseCreateDialog}
         maxWidth="sm"
         fullWidth
       >
@@ -477,9 +728,15 @@ export default function ProgressPage() {
                 value={formData.hiveId}
                 label="Colmena"
                 onChange={e =>
-                  setFormData({ ...formData, hiveId: e.target.value })
+                  setFormData(prev => ({
+                    ...prev,
+                    hiveId: e.target.value,
+                  }))
                 }
               >
+                <MenuItem value="">
+                  <em>Selecciona una colmena</em>
+                </MenuItem>
                 {myHives.map(hive => (
                   <MenuItem key={hive.id} value={hive.id}>
                     {hive.name}
@@ -488,21 +745,36 @@ export default function ProgressPage() {
               </Select>
             </FormControl>
 
-            <FormControl fullWidth>
+            <FormControl fullWidth disabled={!formData.hiveId}>
               <InputLabel>Hábito</InputLabel>
               <Select
                 value={formData.habitId}
                 label="Hábito"
                 onChange={e =>
-                  setFormData({ ...formData, habitId: e.target.value })
+                  setFormData(prev => ({
+                    ...prev,
+                    habitId: e.target.value,
+                  }))
                 }
               >
-                {Array.from(myHabits.values()).map(habit => (
+                <MenuItem value="">
+                  <em>
+                    {formData.hiveId
+                      ? 'Selecciona un hábito'
+                      : 'Elige una colmena primero'}
+                  </em>
+                </MenuItem>
+                {availableHabitsForHive.map(habit => (
                   <MenuItem key={habit.id} value={habit.id}>
                     {habit.title}
                   </MenuItem>
                 ))}
               </Select>
+              {formData.hiveId && availableHabitsForHive.length === 0 && (
+                <FormHelperText>
+                  Esta colmena aún no tiene hábitos asignados.
+                </FormHelperText>
+              )}
             </FormControl>
 
             <TextField
@@ -510,7 +782,9 @@ export default function ProgressPage() {
               label="Fecha"
               type="date"
               value={formData.date}
-              onChange={e => setFormData({ ...formData, date: e.target.value })}
+              onChange={e =>
+                setFormData(prev => ({ ...prev, date: e.target.value }))
+              }
               InputLabelProps={{ shrink: true }}
             />
 
@@ -520,10 +794,10 @@ export default function ProgressPage() {
                 value={formData.status}
                 label="Estado"
                 onChange={e =>
-                  setFormData({
-                    ...formData,
+                  setFormData(prev => ({
+                    ...prev,
                     status: e.target.value as ProgressStatus,
-                  })
+                  }))
                 }
               >
                 <MenuItem value={ProgressStatus.COMPLETED}>Completado</MenuItem>
@@ -531,14 +805,132 @@ export default function ProgressPage() {
                 <MenuItem value={ProgressStatus.FAILED}>Fallido</MenuItem>
               </Select>
             </FormControl>
+
+            {selectedHabitDetails && (
+              <Stack
+                spacing={
+                  selectedHabitDetails.evidenceType === EvidenceType.WITNESS
+                    ? 2
+                    : 1
+                }
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Evidencia requerida:{' '}
+                  {evidenceTypeDescriptions[selectedHabitDetails.evidenceType]}
+                </Typography>
+
+                {selectedHabitDetails.evidenceType === EvidenceType.PHOTO && (
+                  <Stack spacing={1}>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      startIcon={<AttachFile />}
+                    >
+                      {evidenceFile ? 'Cambiar archivo' : 'Adjuntar evidencia'}
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={event => {
+                          const file = event.currentTarget.files?.[0] ?? null;
+                          setEvidenceFile(file);
+                        }}
+                      />
+                    </Button>
+                    {evidenceFile && (
+                      <Typography variant="caption" color="text.secondary">
+                        {evidenceFile.name}
+                      </Typography>
+                    )}
+                  </Stack>
+                )}
+
+                {selectedHabitDetails.evidenceType === EvidenceType.SELF && (
+                  <TextField
+                    fullWidth
+                    label="Describe tu progreso"
+                    multiline
+                    minRows={3}
+                    value={formData.evidenceNotes}
+                    onChange={e =>
+                      setFormData(prev => ({
+                        ...prev,
+                        evidenceNotes: e.target.value,
+                      }))
+                    }
+                  />
+                )}
+
+                {selectedHabitDetails.evidenceType === EvidenceType.API && (
+                  <TextField
+                    fullWidth
+                    label="Referencia o enlace de evidencia"
+                    value={formData.evidenceNotes}
+                    onChange={e =>
+                      setFormData(prev => ({
+                        ...prev,
+                        evidenceNotes: e.target.value,
+                      }))
+                    }
+                    helperText="Incluye un enlace, código o texto que respalde tu avance"
+                  />
+                )}
+
+                {selectedHabitDetails.evidenceType === EvidenceType.WITNESS && (
+                  <Stack spacing={2}>
+                    <TextField
+                      fullWidth
+                      label="Nombre del verificador"
+                      value={formData.witnessName}
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          witnessName: e.target.value,
+                        }))
+                      }
+                    />
+                    <TextField
+                      fullWidth
+                      label="Contacto del verificador (opcional)"
+                      value={formData.witnessContact}
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          witnessContact: e.target.value,
+                        }))
+                      }
+                    />
+                    <TextField
+                      fullWidth
+                      label="Notas adicionales (opcional)"
+                      multiline
+                      minRows={2}
+                      value={formData.evidenceNotes}
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          evidenceNotes: e.target.value,
+                        }))
+                      }
+                    />
+                  </Stack>
+                )}
+
+                {evidenceMissing && (
+                  <Typography variant="caption" color="error">
+                    Completa la evidencia para poder registrar tu progreso.
+                  </Typography>
+                )}
+              </Stack>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)}>Cancelar</Button>
+          <Button onClick={handleCloseCreateDialog}>Cancelar</Button>
           <Button
             onClick={handleCreateProgress}
             variant="contained"
-            disabled={!formData.hiveId || !formData.habitId}
+            disabled={!canSubmit}
           >
             Registrar
           </Button>

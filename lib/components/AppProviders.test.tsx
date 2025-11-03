@@ -148,8 +148,11 @@ describe('AppProviders', () => {
     );
 
     // Verify the main element is inside the flex container
-    const mainElement = container.querySelector('main.main-content');
-    const flexContainer = container.querySelector('[style*="display: flex"]');
+    const mainElement =
+      container.querySelector<HTMLElement>('main.main-content');
+    const flexContainer = container.querySelector<HTMLElement>(
+      '[style*="display: flex"]'
+    );
 
     expect(mainElement).toBeInTheDocument();
     expect(flexContainer).toBeInTheDocument();
