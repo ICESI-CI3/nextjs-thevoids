@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { HabitType } from './habits';
+import { HabitType, EvidenceType } from './habits';
 
 export enum HiveStatus {
   CANCELLED = 'cancelled',
@@ -13,12 +13,15 @@ export interface Hive {
   name: string;
   description?: string;
   createdById: string;
+  habitId?: string;
   durationDays: number;
   entryFee: number;
   eliminationType: string;
   allowedHabitTypes: HabitType[];
   status: HiveStatus;
   isPublic: boolean;
+  startDate?: string;
+  endDate?: string;
   createdAt: string;
   updatedAt: string;
   createdBy?: {
@@ -26,9 +29,32 @@ export interface Hive {
     name: string;
     email: string;
   };
+  habit?: {
+    id: string;
+    title: string;
+    type: HabitType;
+    evidenceType: EvidenceType;
+    points?: number;
+  };
+  habitHives?: HabitHiveRelation[];
   members?: HiveMemberSummary[];
   _count?: {
     members: number;
+  };
+}
+
+export interface HabitHiveRelation {
+  id: string;
+  hiveId: string;
+  habitId: string;
+  assignedAt: string;
+  habit: {
+    id: string;
+    title: string;
+    type: HabitType;
+    evidenceType: EvidenceType;
+    frequency?: string;
+    isActive?: boolean;
   };
 }
 

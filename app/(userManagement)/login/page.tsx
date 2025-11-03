@@ -23,7 +23,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/users');
+      router.push('/');
     }
   }, [isAuthenticated, router]);
 
@@ -35,7 +35,7 @@ export default function LoginPage() {
     const result = await login({ email, password });
 
     if (result.success) {
-      router.push('/users');
+      router.push('/');
     } else {
       setError(result.error || 'Error al iniciar sesión');
       setIsLoading(false);

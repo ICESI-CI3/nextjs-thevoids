@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Box,
   Button,
@@ -16,7 +16,6 @@ import {
   Card,
   CardContent,
   CardActions,
-  Grid,
   InputAdornment,
   FormControl,
   InputLabel,
@@ -35,6 +34,7 @@ import {
   ListItemAvatar,
   ListItemText,
 } from '@mui/material';
+import Grid from '@mui/material/Grid';
 import {
   Add,
   Search,
@@ -55,12 +55,13 @@ import {
 } from '@mui/icons-material';
 import { hivesApi, Hive, CreateHiveDto, HiveStatus } from '@/lib/api/hives';
 import { hiveMembersApi, MemberRole } from '@/lib/api/hiveMembers';
-import { HabitType } from '@/lib/api/habits';
+import { HabitType, Habit, habitsApi } from '@/lib/api/habits';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
 export default function Hives() {
   const [hives, setHives] = useState<Hive[]>([]);
   const [filteredHives, setFilteredHives] = useState<Hive[]>([]);
+  const [habits, setHabits] = useState<Habit[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -87,8 +88,12 @@ export default function Hives() {
   });
 
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
-  const hasLoadedRef = useRef(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [habitFilter, setHabitFilter] = useState<string>('all');
+
+  const habitIdParam = searchParams.get('habitId');
+  const activeHabitFilter = habitIdParam || habitFilter;
 
   const loadHives = useCallback(async () => {
     setIsLoading(true);
@@ -103,25 +108,37 @@ export default function Hives() {
     setIsLoading(false);
   }, []);
 
+  const loadHabits = useCallback(async () => {
+    const response = await habitsApi.getAll();
+    if (response.data) {
+      setHabits(response.data);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    if (authLoading) return;
+
+    if (!isAuthenticated) {
       router.push('/login');
       return;
     }
 
-    if (isAuthenticated && !hasLoadedRef.current) {
-      hasLoadedRef.current = true;
-      // avoid calling setState synchronously inside effect
-      const t = setTimeout(() => loadHives(), 0);
-      return () => clearTimeout(t);
-    }
-  }, [isAuthenticated, authLoading, loadHives, router]);
+    const timer = setTimeout(() => {
+      loadHives();
+      loadHabits();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [isAuthenticated, authLoading, loadHives, loadHabits, router]);
 
-  // Filter hives based on search and filters
   useEffect(() => {
     let filtered = hives;
 
-    // Search filter
+    if (activeHabitFilter && activeHabitFilter !== 'all') {
+      filtered = filtered.filter(hive =>
+        hive.habitHives?.some(hh => hh.habitId === activeHabitFilter)
+      );
+    }
+
     if (searchTerm) {
       filtered = filtered.filter(
         hive =>
@@ -130,15 +147,13 @@ export default function Hives() {
       );
     }
 
-    // Status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(hive => hive.status === statusFilter);
     }
 
-    // avoid calling setState synchronously inside effect
     const t = setTimeout(() => setFilteredHives(filtered), 0);
     return () => clearTimeout(t);
-  }, [searchTerm, statusFilter, hives]);
+  }, [searchTerm, statusFilter, activeHabitFilter, hives]);
 
   const handleOpenDialog = (hive?: Hive) => {
     if (hive) {
@@ -216,21 +231,78 @@ export default function Hives() {
     }
   };
 
-  const handleJoinHive = async (hiveId: string) => {
-    if (!user) return;
+  const [joinConfirmDialog, setJoinConfirmDialog] = useState(false);
+  const [hiveToJoin, setHiveToJoin] = useState<Hive | null>(null);
+
+  const handleJoinHive = async () => {
+    if (!user || !hiveToJoin) {
+      setError('Debes iniciar sesión para unirte a una colmena');
+      setJoinConfirmDialog(false);
+      setHiveToJoin(null);
+      return;
+    }
+
     setError('');
     setSuccess('');
+
+    const isAlreadyMember = hiveToJoin.members?.some(m => m.userId === user.id);
+    if (isAlreadyMember) {
+      setError('Ya eres miembro de esta colmena');
+      setJoinConfirmDialog(false);
+      setHiveToJoin(null);
+      return;
+    }
+
     const response = await hiveMembersApi.create({
-      hiveId,
+      hiveId: hiveToJoin.id,
       userId: user.id,
       role: MemberRole.MEMBER,
     });
+
+    setJoinConfirmDialog(false);
+    setHiveToJoin(null);
+
     if (response.error) {
-      setError(response.error);
+      if (response.status === 401 || response.status === 403) {
+        setError('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+        setTimeout(() => {
+          router.push('/login');
+        }, 2000);
+      } else {
+        setError(response.error);
+      }
     } else {
-      setSuccess('¡Te has unido a la colmena!');
+      setSuccess(
+        `¡Te has unido a "${hiveToJoin.name}"! ${
+          hiveToJoin.entryFee > 0
+            ? `Cuota de entrada: $${hiveToJoin.entryFee}`
+            : ''
+        }`
+      );
       loadHives();
     }
+  };
+
+  const promptJoinHive = (hive: Hive) => {
+    if (!isAuthenticated || !user) {
+      setError('Debes iniciar sesión para unirte a una colmena');
+      router.push('/login');
+      return;
+    }
+
+    const isAlreadyMember = hive.members?.some(m => m.userId === user.id);
+    if (isAlreadyMember) {
+      setError('Ya eres miembro de esta colmena');
+      return;
+    }
+
+    setHiveToJoin(hive);
+    setJoinConfirmDialog(true);
+  };
+
+  const isUserMember = (hive: Hive): boolean => {
+    if (!user) return false;
+    return hive.members?.some(m => m.userId === user.id) || false;
   };
 
   const handleViewDetails = (hive: Hive) => {
@@ -279,7 +351,7 @@ export default function Hives() {
       case HiveStatus.CANCELLED:
         return <Cancel />;
       default:
-        return null;
+        return undefined; // ✅ antes retornaba null
     }
   };
 
@@ -370,6 +442,34 @@ export default function Hives() {
             <MenuItem value={HiveStatus.CANCELLED}>Canceladas</MenuItem>
           </Select>
         </FormControl>
+        <FormControl sx={{ minWidth: 200 }}>
+          <InputLabel>Hábito</InputLabel>
+          <Select
+            value={activeHabitFilter}
+            label="Hábito"
+            onChange={e => {
+              const newValue = e.target.value;
+              setHabitFilter(newValue);
+              if (habitIdParam) {
+                const newSearchParams = new URLSearchParams(searchParams);
+                newSearchParams.delete('habitId');
+                const searchString = newSearchParams.toString();
+                if (searchString) {
+                  router.replace(`/hives?${searchString}`);
+                } else {
+                  router.replace('/hives');
+                }
+              }
+            }}
+          >
+            <MenuItem value="all">Todos</MenuItem>
+            {habits.map(habit => (
+              <MenuItem key={habit.id} value={habit.id}>
+                {habit.title}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </Stack>
 
       {/* Hives Grid */}
@@ -392,19 +492,21 @@ export default function Hives() {
       ) : (
         <Grid container spacing={3}>
           {filteredHives.map(hive => (
-            <Grid item xs={12} sm={6} md={4} key={hive.id}>
+            <Grid key={hive.id} size={{ xs: 12, sm: 6, md: 4 }}>
               <Card
                 sx={{
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
                   transition: 'transform 0.2s, box-shadow 0.2s',
+                  cursor: 'pointer',
                   '&:hover': {
                     transform: 'translateY(-4px)',
                     boxShadow: 4,
                   },
                   position: 'relative',
                 }}
+                onClick={() => handleViewDetails(hive)}
               >
                 {/* Privacy Icon */}
                 <Box
@@ -430,6 +532,26 @@ export default function Hives() {
                   <Typography variant="h6" component="h2" gutterBottom>
                     {hive.name}
                   </Typography>
+
+                  {hive.habitHives && hive.habitHives.length > 0 && (
+                    <Box sx={{ mb: 1.5 }}>
+                      <Chip
+                        label={hive.habitHives[0].habit.title}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        sx={{ maxWidth: '100%' }}
+                      />
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block', mt: 0.5 }}
+                      >
+                        {hive.habitHives[0].habit.type} •{' '}
+                        {hive.habitHives[0].habit.evidenceType}
+                      </Typography>
+                    </Box>
+                  )}
 
                   <Typography
                     variant="body2"
@@ -501,6 +623,7 @@ export default function Hives() {
 
                 <CardActions
                   sx={{ justifyContent: 'space-between', px: 2, py: 1.5 }}
+                  onClick={e => e.stopPropagation()}
                 >
                   <Button
                     size="small"
@@ -511,14 +634,21 @@ export default function Hives() {
                   </Button>
                   <Box>
                     {hive.status === HiveStatus.OPEN && (
-                      <Tooltip title="Unirse">
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => handleJoinHive(hive.id)}
-                        >
-                          <PersonAdd fontSize="small" />
-                        </IconButton>
+                      <Tooltip
+                        title={
+                          isUserMember(hive) ? 'Ya eres miembro' : 'Unirse'
+                        }
+                      >
+                        <span>
+                          <IconButton
+                            size="small"
+                            color={isUserMember(hive) ? 'default' : 'primary'}
+                            onClick={() => promptJoinHive(hive)}
+                            disabled={isUserMember(hive)}
+                          >
+                            <PersonAdd fontSize="small" />
+                          </IconButton>
+                        </span>
                       </Tooltip>
                     )}
                     <Tooltip title="Editar">
@@ -584,7 +714,7 @@ export default function Hives() {
             helperText="Describe el objetivo y reglas de la colmena"
           />
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 margin="dense"
                 label="Duración (días)"
@@ -600,7 +730,7 @@ export default function Hives() {
                 inputProps={{ min: 1 }}
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 margin="dense"
                 label="Cuota de entrada ($)"
@@ -712,7 +842,7 @@ export default function Hives() {
               <Divider sx={{ my: 2 }} />
 
               <Grid container spacing={2}>
-                <Grid item xs={6}>
+                <Grid size={6}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Estado
                   </Typography>
@@ -724,7 +854,7 @@ export default function Hives() {
                     sx={{ mt: 0.5 }}
                   />
                 </Grid>
-                <Grid item xs={6}>
+                <Grid size={6}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Duración
                   </Typography>
@@ -732,7 +862,7 @@ export default function Hives() {
                     {selectedHive.durationDays} días
                   </Typography>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid size={6}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Cuota de entrada
                   </Typography>
@@ -740,7 +870,7 @@ export default function Hives() {
                     ${selectedHive.entryFee}
                   </Typography>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid size={6}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Tipo de eliminación
                   </Typography>
@@ -748,7 +878,7 @@ export default function Hives() {
                     {selectedHive.eliminationType}
                   </Typography>
                 </Grid>
-                <Grid item xs={12}>
+                <Grid size={12}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Tipos de hábitos permitidos
                   </Typography>
@@ -793,21 +923,81 @@ export default function Hives() {
           )}
         </DialogContent>
         <DialogActions>
-          {selectedHive?.status === HiveStatus.OPEN && (
-            <Button
-              variant="contained"
-              startIcon={<PersonAdd />}
-              onClick={() => {
-                if (selectedHive) {
-                  handleJoinHive(selectedHive.id);
-                  setDetailsDialogOpen(false);
-                }
-              }}
-            >
-              Unirse a la Colmena
-            </Button>
-          )}
+          {selectedHive?.status === HiveStatus.OPEN &&
+            !isUserMember(selectedHive) && (
+              <Button
+                variant="contained"
+                startIcon={<PersonAdd />}
+                onClick={() => {
+                  if (selectedHive) {
+                    promptJoinHive(selectedHive);
+                    setDetailsDialogOpen(false);
+                  }
+                }}
+              >
+                Unirse a la Colmena
+              </Button>
+            )}
           <Button onClick={() => setDetailsDialogOpen(false)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Join Confirmation Dialog */}
+      <Dialog
+        open={joinConfirmDialog}
+        onClose={() => {
+          setJoinConfirmDialog(false);
+          setHiveToJoin(null);
+        }}
+      >
+        <DialogTitle>Unirse a Colmena</DialogTitle>
+        <DialogContent>
+          {hiveToJoin && (
+            <Box>
+              <Typography variant="body1" gutterBottom>
+                ¿Quieres unirte a <strong>{hiveToJoin.name}</strong>?
+              </Typography>
+              {hiveToJoin.habitHives && hiveToJoin.habitHives.length > 0 && (
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  <Typography variant="body2">
+                    <strong>Hábito:</strong>{' '}
+                    {hiveToJoin.habitHives[0].habit.title}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Tipo:</strong> {hiveToJoin.habitHives[0].habit.type}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Evidencia:</strong>{' '}
+                    {hiveToJoin.habitHives[0].habit.evidenceType}
+                  </Typography>
+                </Alert>
+              )}
+              {hiveToJoin.entryFee > 0 && (
+                <Alert severity="warning" sx={{ mt: 2 }}>
+                  <Typography variant="body2">
+                    Esta colmena tiene una cuota de entrada de{' '}
+                    <strong>${hiveToJoin.entryFee}</strong>
+                  </Typography>
+                </Alert>
+              )}
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                Duración: {hiveToJoin.durationDays} días
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setJoinConfirmDialog(false);
+              setHiveToJoin(null);
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button onClick={handleJoinHive} variant="contained" color="primary">
+            Confirmar
+          </Button>
         </DialogActions>
       </Dialog>
 

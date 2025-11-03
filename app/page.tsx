@@ -11,7 +11,18 @@ import {
   CardContent,
   CardActionArea,
 } from '@mui/material';
-import { Person, Badge, Lock, AdminPanelSettings } from '@mui/icons-material';
+import {
+  Person,
+  Badge,
+  Lock,
+  AdminPanelSettings,
+  Hive,
+  Work,
+  PowerOffRounded,
+  Loop,
+  CreditCard,
+  Receipt,
+} from '@mui/icons-material';
 
 export default function HomePage() {
   const { isAuthenticated, user } = useAuth();
@@ -52,6 +63,48 @@ export default function HomePage() {
       path: '/rolePermissions',
       color: '#ec4899',
     },
+    {
+      title: 'Colmenas',
+      description: 'Gestionar colmenas y hábitos',
+      icon: <Hive sx={{ fontSize: 60 }} />,
+      path: '/hives',
+      color: '#10b981',
+    },
+    {
+      title: 'Hábitos',
+      description: 'Administrar tus hábitos',
+      icon: <Work sx={{ fontSize: 60 }} />,
+      path: '/habits',
+      color: '#ef4444',
+    },
+    {
+      title: 'Progresos',
+      description: 'Ver y analizar tu progreso',
+      icon: <Loop sx={{ fontSize: 60 }} />,
+      path: '/progress',
+      color: '#3b82f6',
+    },
+    {
+      title: 'Pagos',
+      description: 'Gestionar pagos y suscripciones',
+      icon: <CreditCard sx={{ fontSize: 60 }} />,
+      path: '/payments',
+      color: '#10b981',
+    },
+    {
+      title: 'Transacciones',
+      description: 'Ver historial de transacciones',
+      icon: <Receipt sx={{ fontSize: 60 }} />,
+      path: '/transactions',
+      color: '#f59e0b',
+    },
+    {
+      title: 'Cerrar Sesión',
+      description: 'Salir de tu cuenta',
+      icon: <PowerOffRounded sx={{ fontSize: 60 }} />,
+      path: '/logout',
+      color: '#ef4444',
+    },
   ];
 
   return (
@@ -60,7 +113,7 @@ export default function HomePage() {
         Bienvenido, {user?.name}
       </Typography>
       <Typography variant="h6" color="text.secondary" gutterBottom>
-        Panel de Administración - HabitHive
+        Selecciona una opción del sistema HabitHive:
       </Typography>
 
       <Grid container spacing={3} sx={{ mt: 4 }}>

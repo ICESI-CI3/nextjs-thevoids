@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -68,7 +68,6 @@ export default function Habits() {
   });
 
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const hasLoadedRef = useRef(false);
   const router = useRouter();
 
   const loadHabits = useCallback(async () => {
@@ -85,16 +84,16 @@ export default function Habits() {
   }, []);
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    if (authLoading) return; // Wait for auth to load
+
+    if (!isAuthenticated) {
       router.push('/login');
       return;
     }
 
-    if (isAuthenticated && !hasLoadedRef.current) {
-      hasLoadedRef.current = true;
-      const t = setTimeout(() => loadHabits(), 0);
-      return () => clearTimeout(t);
-    }
+    // Load habits automatically when authenticated
+    const timer = setTimeout(() => loadHabits(), 0);
+    return () => clearTimeout(timer);
   }, [isAuthenticated, authLoading, loadHabits, router]);
 
   useEffect(() => {
@@ -184,6 +183,10 @@ export default function Habits() {
       setHabitToDelete(null);
       loadHabits();
     }
+  };
+
+  const handleViewHives = (habitId: string) => {
+    router.push(`/hives?habitId=${habitId}`);
   };
 
   const getTypeColor = (type: HabitType) => {
@@ -358,11 +361,13 @@ export default function Habits() {
                   display: 'flex',
                   flexDirection: 'column',
                   transition: 'transform 0.2s, box-shadow 0.2s',
+                  cursor: 'pointer',
                   '&:hover': {
                     transform: 'translateY(-4px)',
                     boxShadow: 4,
                   },
                 }}
+                onClick={() => handleViewHives(habit.id)}
               >
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Box
@@ -413,7 +418,18 @@ export default function Habits() {
                   </Stack>
                 </CardContent>
 
-                <CardActions sx={{ justifyContent: 'flex-end', px: 2, pb: 2 }}>
+                <CardActions
+                  sx={{ justifyContent: 'flex-end', px: 2, pb: 2 }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <Tooltip title="Ver Colmenas">
+                    <IconButton
+                      size="small"
+                      onClick={() => handleViewHives(habit.id)}
+                    >
+                      <Api fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                   <Tooltip title="Editar">
                     <IconButton
                       size="small"

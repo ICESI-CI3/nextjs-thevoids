@@ -32,11 +32,11 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 
 export const navItems = [
   { href: '/habits', label: 'Hábitos', icon: CheckCircleOutline },
-  { href: '/hiveMembers', label: 'Miembros de Colmena', icon: People },
-  { href: '/hives', label: 'Colmenas', icon: Hive },
+  { href: '/hives', label: 'Explorar Colmenas', icon: Hive },
+  { href: '/myHives', label: 'Mis Colmenas', icon: People },
+  { href: '/progress', label: 'Mi Progreso', icon: TrendingUp },
   { href: '/payments', label: 'Pagos', icon: Payment },
   { href: '/permissions', label: 'Permisos', icon: Lock },
-  { href: '/progresses', label: 'Progresos', icon: TrendingUp },
   {
     href: '/rolePermissions',
     label: 'Permisos de Roles',
