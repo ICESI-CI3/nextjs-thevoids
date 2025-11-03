@@ -22,6 +22,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   Refresh,
@@ -30,10 +34,12 @@ import {
   CheckCircle,
   HourglassEmpty,
   EmojiEvents,
+  Edit,
 } from '@mui/icons-material';
 import {
   hiveMembersApi,
   HiveMember,
+  MemberRole,
   MemberStatus,
 } from '@/lib/api/hiveMembers';
 import { hivesApi, Hive, HiveStatus } from '@/lib/api/hives';
@@ -72,6 +78,13 @@ export default function MyHives() {
     membership: HiveMember;
     hive: Hive;
   } | null>(null);
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [statusTarget, setStatusTarget] = useState<{
+    membership: HiveMember;
+    hive: Hive;
+  } | null>(null);
+  const [nextStatus, setNextStatus] = useState<HiveStatus>(HiveStatus.OPEN);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const router = useRouter();
@@ -80,35 +93,118 @@ export default function MyHives() {
   const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   const loadMyHives = useCallback(async () => {
-    if (!user) return;
+    const userId = user?.id;
+    if (!userId) return;
 
     setIsLoading(true);
     setError('');
-    setCurrentTime(Date.now()); // Update current time when loading data
+    setCurrentTime(Date.now());
 
-    // Obtener mis membresías
-    const membersResponse = await hiveMembersApi.getByUser(user.id);
-    if (membersResponse.error) {
-      setError(membersResponse.error);
-      setIsLoading(false);
-      return;
-    }
-
-    // Filtrar solo mis membresías
-    const myMembershipsData = membersResponse.data || [];
-    setMyMemberships(myMembershipsData);
-
-    // Obtener detalles de cada colmena
-    const hivesMap = new Map<string, Hive>();
-    for (const membership of myMembershipsData) {
-      const hiveResponse = await hivesApi.getById(membership.hiveId);
-      if (hiveResponse.data) {
-        hivesMap.set(membership.hiveId, hiveResponse.data);
+    try {
+      const membersResponse = await hiveMembersApi.getByUser(userId);
+      if (membersResponse.error) {
+        setError(membersResponse.error);
+        setMyMemberships([]);
+        setHives(new Map());
+        return;
       }
-    }
-    setHives(hivesMap);
 
-    setIsLoading(false);
+      const myMembershipsData = membersResponse.data || [];
+      setMyMemberships(myMembershipsData);
+
+      if (!myMembershipsData.length) {
+        setHives(new Map());
+        return;
+      }
+
+      const results = await Promise.all(
+        myMembershipsData.map(async membership => {
+          const result: {
+            hiveId: string;
+            hive?: Hive;
+            error?: string;
+          } = {
+            hiveId: membership.hiveId,
+          };
+
+          const [hiveResponse, hiveMembersResponse] = await Promise.all([
+            hivesApi.getById(membership.hiveId),
+            hiveMembersApi.getByHive(membership.hiveId),
+          ]);
+
+          if (hiveResponse.error || !hiveResponse.data) {
+            result.error =
+              hiveResponse.error ||
+              'No se pudieron cargar los detalles de la colmena.';
+            return result;
+          }
+
+          const hiveData = hiveResponse.data;
+          let membersSummary =
+            hiveData.members?.map(member => ({
+              id: member.id,
+              userId: member.userId,
+              role: member.role,
+              status: member.status,
+              user: member.user,
+            })) || [];
+
+          if (!hiveMembersResponse.error && hiveMembersResponse.data) {
+            membersSummary = hiveMembersResponse.data.map(member => ({
+              id: member.id,
+              userId: member.userId,
+              role: member.role,
+              status: member.status,
+              user: member.user,
+            }));
+          }
+
+          const activeMembersCount = membersSummary.filter(
+            member => member.status === MemberStatus.ACTIVE
+          ).length;
+
+          result.hive = {
+            ...hiveData,
+            members: membersSummary,
+            _count: {
+              members:
+                activeMembersCount ||
+                hiveData._count?.members ||
+                membersSummary.length,
+            },
+          } as Hive;
+
+          return result;
+        })
+      );
+
+      const hivesMap = new Map<string, Hive>();
+      const hiveErrors: string[] = [];
+
+      results.forEach(result => {
+        if (!result) return;
+        if (result.error) {
+          hiveErrors.push(result.error);
+        }
+        if (result.hive) {
+          hivesMap.set(result.hiveId, result.hive);
+        }
+      });
+
+      if (hiveErrors.length) {
+        setError(prev => prev || hiveErrors[0]);
+      }
+
+      setHives(hivesMap);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Ocurrió un error al cargar tus colmenas.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -150,6 +246,51 @@ export default function MyHives() {
   const promptLeaveHive = (membership: HiveMember, hive: Hive) => {
     setMembershipToLeave({ membership, hive });
     setLeaveDialogOpen(true);
+  };
+
+  const promptUpdateStatus = (membership: HiveMember, hive: Hive) => {
+    setStatusTarget({ membership, hive });
+    setNextStatus(hive.status);
+    setStatusDialogOpen(true);
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!statusTarget) return;
+    if (nextStatus === statusTarget.hive.status) {
+      setStatusDialogOpen(false);
+      setStatusTarget(null);
+      return;
+    }
+
+    setIsUpdatingStatus(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await hivesApi.update(statusTarget.hive.id, {
+        status: nextStatus,
+      });
+
+      if (response.error) {
+        setError(response.error);
+        return;
+      }
+
+      setSuccess(
+        `Estado de "${response.data?.name ?? statusTarget.hive.name}" actualizado a ${getStatusLabel(nextStatus)}`
+      );
+      await loadMyHives();
+      setStatusDialogOpen(false);
+      setStatusTarget(null);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo actualizar el estado de la colmena.'
+      );
+    } finally {
+      setIsUpdatingStatus(false);
+    }
   };
 
   const activeMemberships = myMemberships.filter(
@@ -236,6 +377,14 @@ export default function MyHives() {
   const renderHiveCard = (membership: HiveMember) => {
     const hive = hives.get(membership.hiveId);
     if (!hive) return null;
+
+    const activeMembers =
+      hive.members?.filter(member => member.status === MemberStatus.ACTIVE) ||
+      [];
+    const memberCount =
+      hive._count?.members !== undefined
+        ? hive._count.members
+        : activeMembers.length;
 
     const progress = calculateProgress(hive);
     const daysRemaining = hive.endDate
@@ -334,11 +483,11 @@ export default function MyHives() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Group fontSize="small" color="action" />
                 <Typography variant="body2" color="text.secondary">
-                  {hive._count?.members || 0} miembros
+                  {memberCount} miembros
                 </Typography>
-                {hive.members && hive.members.length > 0 && (
+                {activeMembers.length > 0 && (
                   <AvatarGroup max={4} sx={{ ml: 'auto' }}>
-                    {hive.members.slice(0, 4).map(member => (
+                    {activeMembers.slice(0, 4).map(member => (
                       <Avatar
                         key={member.id}
                         sx={{ width: 24, height: 24, fontSize: 12 }}
@@ -359,7 +508,8 @@ export default function MyHives() {
           </CardContent>
 
           {/* Acciones */}
-          {membership.status === MemberStatus.ACTIVE && (
+          {(membership.role === MemberRole.OWNER ||
+            membership.status === MemberStatus.ACTIVE) && (
             <Box
               sx={{
                 p: 2,
@@ -367,16 +517,29 @@ export default function MyHives() {
                 borderColor: 'divider',
                 display: 'flex',
                 justifyContent: 'flex-end',
+                gap: 1,
+                flexWrap: 'wrap',
               }}
             >
-              <Button
-                size="small"
-                color="error"
-                startIcon={<ExitToApp />}
-                onClick={() => promptLeaveHive(membership, hive)}
-              >
-                Abandonar
-              </Button>
+              {membership.role === MemberRole.OWNER && (
+                <Button
+                  size="small"
+                  startIcon={<Edit />}
+                  onClick={() => promptUpdateStatus(membership, hive)}
+                >
+                  Actualizar estado
+                </Button>
+              )}
+              {membership.status === MemberStatus.ACTIVE && (
+                <Button
+                  size="small"
+                  color="error"
+                  startIcon={<ExitToApp />}
+                  onClick={() => promptLeaveHive(membership, hive)}
+                >
+                  Abandonar
+                </Button>
+              )}
             </Box>
           )}
         </Card>
@@ -544,6 +707,75 @@ export default function MyHives() {
           </TabPanel>
         </>
       )}
+
+      <Dialog
+        open={statusDialogOpen}
+        onClose={() => {
+          if (isUpdatingStatus) return;
+          setStatusDialogOpen(false);
+          setStatusTarget(null);
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Actualizar estado</DialogTitle>
+        <DialogContent>
+          {statusTarget && (
+            <Box sx={{ mt: 1 }}>
+              <Typography>
+                Selecciona el nuevo estado para &apos;{statusTarget.hive.name}
+                &apos;
+              </Typography>
+              <FormControl fullWidth sx={{ mt: 2 }}>
+                <InputLabel id="hive-status-select-label">
+                  Nuevo estado
+                </InputLabel>
+                <Select
+                  labelId="hive-status-select-label"
+                  label="Nuevo estado"
+                  value={nextStatus}
+                  onChange={event =>
+                    setNextStatus(event.target.value as HiveStatus)
+                  }
+                >
+                  {[
+                    HiveStatus.OPEN,
+                    HiveStatus.IN_PROGRESS,
+                    HiveStatus.FINISHED,
+                    HiveStatus.CANCELLED,
+                  ].map(statusValue => (
+                    <MenuItem key={statusValue} value={statusValue}>
+                      {getStatusLabel(statusValue)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setStatusDialogOpen(false);
+              setStatusTarget(null);
+            }}
+            disabled={isUpdatingStatus}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleUpdateStatus}
+            disabled={
+              isUpdatingStatus ||
+              !statusTarget ||
+              nextStatus === statusTarget.hive.status
+            }
+          >
+            {isUpdatingStatus ? 'Guardando...' : 'Actualizar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={leaveDialogOpen}
