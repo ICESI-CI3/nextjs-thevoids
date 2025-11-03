@@ -7,6 +7,7 @@ const createJestConfig = nextJest({
 
 const customJestConfig: Config = {
   coverageProvider: 'v8',
+  coverageReporters: ['json', 'json-summary', 'lcov', 'text', 'clover'],
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
