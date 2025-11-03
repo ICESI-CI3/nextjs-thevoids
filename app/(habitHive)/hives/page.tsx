@@ -58,6 +58,7 @@ import { hivesApi, Hive, CreateHiveDto, HiveStatus } from '@/lib/api/hives';
 import { habitHivesApi } from '@/lib/api/habitHives';
 import { hiveMembersApi, MemberRole } from '@/lib/api/hiveMembers';
 import { HabitType, Habit, habitsApi } from '@/lib/api/habits';
+import { paymentsApi } from '@/lib/api/payments';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
 export default function Hives() {
@@ -277,6 +278,7 @@ export default function Hives() {
 
   const [joinConfirmDialog, setJoinConfirmDialog] = useState(false);
   const [hiveToJoin, setHiveToJoin] = useState<Hive | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const handleJoinHive = async () => {
     if (!user || !hiveToJoin) {
@@ -297,33 +299,93 @@ export default function Hives() {
       return;
     }
 
-    const response = await hiveMembersApi.create({
-      hiveId: hiveToJoin.id,
-      userId: user.id,
-      role: MemberRole.MEMBER,
-    });
+    if (!user.email) {
+      setError('No se encontró un correo electrónico válido para el usuario.');
+      setJoinConfirmDialog(false);
+      setHiveToJoin(null);
+      return;
+    }
 
-    setJoinConfirmDialog(false);
-    setHiveToJoin(null);
+    const entryFeeValue = Number(hiveToJoin.entryFee || 0);
 
-    if (response.error) {
-      if (response.status === 401 || response.status === 403) {
-        setError('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
-        setTimeout(() => {
-          router.push('/login');
-        }, 2000);
-      } else {
-        setError(response.error);
+    setIsProcessingPayment(true);
+
+    try {
+      const response = await hiveMembersApi.create({
+        hiveId: hiveToJoin.id,
+        userId: user.id,
+        role: MemberRole.MEMBER,
+      });
+
+      if (response.error) {
+        if (response.status === 401 || response.status === 403) {
+          setError(
+            'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+          );
+          setTimeout(() => {
+            router.push('/login');
+          }, 2000);
+        } else {
+          setError(response.error);
+        }
+        setJoinConfirmDialog(false);
+        setHiveToJoin(null);
+        return;
       }
-    } else {
-      setSuccess(
-        `¡Te has unido a "${hiveToJoin.name}"! ${
-          hiveToJoin.entryFee > 0
-            ? `Cuota de entrada: $${hiveToJoin.entryFee}`
-            : ''
-        }`
-      );
+
+      let joinMessage = `¡Te has unido a "${hiveToJoin.name}"!`;
+
+      if (entryFeeValue > 0) {
+        const amountInCents = Math.max(0, Math.round(entryFeeValue * 100));
+
+        const paymentResponse = await paymentsApi.create({
+          amount: amountInCents,
+          currency: 'usd',
+          userId: user.id,
+          customerEmail: user.email,
+          hiveId: hiveToJoin.id,
+          metadata: {
+            description: `Cuota de entrada para la colmena ${hiveToJoin.name}`,
+          },
+        });
+
+        if (paymentResponse.error || !paymentResponse.data) {
+          setError(
+            paymentResponse.error ||
+              'No se pudo iniciar el pago. Intenta nuevamente.'
+          );
+          try {
+            await hiveMembersApi.delete(hiveToJoin.id, user.id);
+          } catch {
+            // Ignored: rollback best effort
+          }
+          setJoinConfirmDialog(false);
+          setHiveToJoin(null);
+          return;
+        }
+
+        const checkoutUrl =
+          paymentResponse.data.paymentIntent.clientSecret ||
+          (typeof paymentResponse.data.paymentIntent.metadata
+            ?.sandbox_init_point === 'string'
+            ? (paymentResponse.data.paymentIntent.metadata
+                ?.sandbox_init_point as string)
+            : undefined);
+
+        if (checkoutUrl) {
+          window.open(checkoutUrl, '_blank', 'noopener,noreferrer');
+        }
+
+        joinMessage +=
+          ' Se generó un pago pendiente. Completa la transacción en la ventana emergente para finalizar tu ingreso.';
+      }
+
+      setSuccess(joinMessage);
+      setJoinConfirmDialog(false);
+      setHiveToJoin(null);
       loadHives();
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -1076,8 +1138,13 @@ export default function Hives() {
           >
             Cancelar
           </Button>
-          <Button onClick={handleJoinHive} variant="contained" color="primary">
-            Confirmar
+          <Button
+            onClick={handleJoinHive}
+            variant="contained"
+            color="primary"
+            disabled={isProcessingPayment}
+          >
+            {isProcessingPayment ? 'Procesando...' : 'Confirmar'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -40,6 +40,12 @@ jest.mock('@/lib/api/habits', () => ({
   },
 }));
 
+jest.mock('@/lib/api/payments', () => ({
+  paymentsApi: {
+    create: jest.fn(),
+  },
+}));
+
 import { hivesApi } from '@/lib/api/hives';
 
 describe('HivesPage', () => {
@@ -65,7 +71,9 @@ describe('HivesPage', () => {
     jest.clearAllMocks();
     (useAuth as jest.Mock).mockReturnValue({
       isAuthenticated: true,
-      user: { id: 'user1', name: 'Test User' },
+      isLoading: false,
+      user: { id: 'user1', name: 'Test User', email: 'test@example.com' },
+      hasPermission: jest.fn().mockReturnValue(true),
     });
     (hivesApi.getAll as jest.Mock).mockResolvedValue({
       data: mockHives,
