@@ -223,12 +223,12 @@ describe('Navbar', () => {
       render(<Navbar />);
 
       // Should show items with allowed permissions
-      expect(screen.getByText('Users')).toBeInTheDocument();
+      expect(screen.getByText('Usuarios')).toBeInTheDocument();
       expect(screen.getByText('Roles')).toBeInTheDocument();
 
       // Should not show items without permissions
-      expect(screen.queryByText('Habits')).not.toBeInTheDocument();
-      expect(screen.queryByText('Permissions')).not.toBeInTheDocument();
+      expect(screen.queryByText('Hábitos')).not.toBeInTheDocument();
+      expect(screen.queryByText('Permisos')).not.toBeInTheDocument();
     });
 
     it('should show all items when user has all permissions', () => {

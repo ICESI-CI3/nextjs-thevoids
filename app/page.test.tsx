@@ -59,7 +59,6 @@ describe('HomePage', () => {
         'Progresos',
         'Pagos',
         'Transacciones',
-        'Cerrar Sesión',
       ];
 
       cardTitles.forEach(title => {
@@ -80,7 +79,6 @@ describe('HomePage', () => {
         'Ver y analizar tu progreso',
         'Gestionar pagos y suscripciones',
         'Ver historial de transacciones',
-        'Salir de tu cuenta',
       ];
 
       descriptions.forEach(description => {
@@ -156,7 +154,7 @@ describe('HomePage', () => {
       render(<HomePage />);
 
       const cards = screen.getAllByRole('button');
-      expect(cards).toHaveLength(10);
+      expect(cards).toHaveLength(9);
 
       cards.forEach(card => {
         expect(card).toBeInTheDocument();
@@ -176,7 +174,6 @@ describe('HomePage', () => {
         'Ver y analizar tu progreso',
         'Gestionar pagos y suscripciones',
         'Ver historial de transacciones',
-        'Salir de tu cuenta',
       ];
 
       descriptions.forEach(description => {

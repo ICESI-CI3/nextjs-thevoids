@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { usePathname } from 'next/navigation';
 import PageHeader from './PageHeader';
 import { useThemeContext } from './ThemeContext';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 // Mock dependencies
 jest.mock('next/navigation', () => ({
@@ -12,11 +13,20 @@ jest.mock('./ThemeContext', () => ({
   useThemeContext: jest.fn(),
 }));
 
+jest.mock('@/lib/contexts/AuthContext', () => ({
+  useAuth: jest.fn(),
+}));
+
 describe('PageHeader', () => {
   const mockToggleTheme = jest.fn();
+  const mockHasPermission = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHasPermission.mockReturnValue(true);
+    (useAuth as jest.Mock).mockReturnValue({
+      hasPermission: mockHasPermission,
+    });
   });
 
   describe('Page Title and Icon', () => {
@@ -33,8 +43,8 @@ describe('PageHeader', () => {
       expect(
         screen.getByText('Gestiona y visualiza tus usuarios')
       ).toBeInTheDocument();
-      // Check if Person icon is rendered (from navItems)
-      expect(screen.getByTestId('PersonIcon')).toBeInTheDocument();
+      // Check if People icon is rendered (from navItems)
+      expect(screen.getByTestId('PeopleIcon')).toBeInTheDocument();
     });
 
     it('should display default title when path not found', () => {
