@@ -71,31 +71,37 @@ jobs:
 
       - name: Check coverage threshold
         run: |
-          node -e "
-            const fs = require('fs');
-            try {
-              const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
-              const metrics = ['lines', 'statements', 'functions', 'branches'];
-              let failed = false;
+          node <<'NODE'
+          const fs = require('fs');
 
-              metrics.forEach(metric => {
-                const pct = coverage.total[metric].pct;
-                console.log(`${metric.charAt(0).toUpperCase() + metric.slice(1)} coverage: ${pct}%`);
-                if (pct < 80) {
-                  console.error(`${metric} coverage ${pct}% is below the required 80% threshold`);
-                  failed = true;
-                }
-              });
+          try {
+            const reportPath = 'coverage/coverage-summary.json';
+            if (!fs.existsSync(reportPath)) {
+              throw new Error(`Coverage report not found at ${reportPath}`);
+            }
 
-              if (failed) {
-                process.exit(1);
+            const coverage = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+            const metrics = ['lines', 'statements', 'functions', 'branches'];
+            let failed = false;
+
+            metrics.forEach(metric => {
+              const pct = coverage.total[metric].pct;
+              console.log(metric.charAt(0).toUpperCase() + metric.slice(1) + ' coverage: ' + pct + '%');
+              if (pct < 80) {
+                console.error(metric + ' coverage ' + pct + '% is below the required 80% threshold');
+                failed = true;
               }
-              console.log('All coverage thresholds met');
-            } catch (error) {
-              console.error('Could not read coverage report:', error.message);
+            });
+
+            if (failed) {
               process.exit(1);
             }
-          "
+            console.log('All coverage thresholds met');
+          } catch (error) {
+            console.error('Could not read coverage report:', error.message);
+            process.exit(1);
+          }
+          NODE
 
   e2e-tests:
     name: E2E Tests
