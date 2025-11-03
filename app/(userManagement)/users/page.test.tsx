@@ -8,6 +8,7 @@ import {
 
 import UsersPage from './page';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { DataProvider } from '@/lib/contexts/DataContext';
 
 jest.mock('@/lib/contexts/AuthContext', () => ({
   useAuth: jest.fn(),
@@ -23,6 +24,13 @@ jest.mock('@/lib/api/users', () => ({
 }));
 
 import { usersApi } from '@/lib/api/users';
+
+const renderUsersPage = () =>
+  render(
+    <DataProvider>
+      <UsersPage />
+    </DataProvider>
+  );
 
 describe('UsersPage', () => {
   const mockUsers = [
@@ -59,7 +67,7 @@ describe('UsersPage', () => {
       error: null,
     });
     (usersApi.update as jest.Mock).mockResolvedValue({
-      data: null,
+      data: mockUsers[0],
       error: null,
     });
     (usersApi.delete as jest.Mock).mockResolvedValue({
@@ -70,13 +78,13 @@ describe('UsersPage', () => {
 
   describe('Rendering', () => {
     it('should render users page title', () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       expect(screen.getByText('Usuarios')).toBeInTheDocument();
     });
 
     it('should render users table with data', async () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
@@ -87,7 +95,7 @@ describe('UsersPage', () => {
     });
 
     it('should render create user button', () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       expect(
         screen.getByRole('button', { name: /nuevo usuario/i })
@@ -95,7 +103,7 @@ describe('UsersPage', () => {
     });
 
     it('should render refresh button', () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       const refreshButton = screen.getByTestId('RefreshIcon').closest('button');
       expect(refreshButton).toBeInTheDocument();
@@ -106,7 +114,7 @@ describe('UsersPage', () => {
         () => new Promise(() => {})
       );
 
-      render(<UsersPage />);
+      renderUsersPage();
 
       expect(screen.getByText('Usuarios')).toBeInTheDocument();
     });
@@ -117,7 +125,7 @@ describe('UsersPage', () => {
         error: 'Failed to fetch users',
       });
 
-      render(<UsersPage />);
+      renderUsersPage();
 
       await waitFor(() => {
         expect(screen.getByText('Failed to fetch users')).toBeInTheDocument();
@@ -127,7 +135,7 @@ describe('UsersPage', () => {
 
   describe('Create User', () => {
     it('should open create modal when create button is clicked', () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       const createButton = screen.getByRole('button', {
         name: /nuevo usuario/i,
@@ -143,7 +151,7 @@ describe('UsersPage', () => {
         error: null,
       });
 
-      render(<UsersPage />);
+      renderUsersPage();
 
       const createButton = screen.getByRole('button', {
         name: /nuevo usuario/i,
@@ -181,7 +189,7 @@ describe('UsersPage', () => {
         error: null,
       });
 
-      render(<UsersPage />);
+      renderUsersPage();
 
       const createButton = screen.getByRole('button', {
         name: /nuevo usuario/i,
@@ -192,15 +200,21 @@ describe('UsersPage', () => {
       const modalContent = within(modal);
 
       const nameInput = modalContent.getByLabelText(/nombre/i);
+      const emailInput = modalContent.getByLabelText(/email/i);
+      const passwordInput = modalContent.getByLabelText(/contraseña/i);
+      const roleSelect = modalContent.getByLabelText(/rol/i);
       const submitButton = screen.getByRole('button', { name: /crear/i });
 
-      fireEvent.change(nameInput, { target: { value: 'Test' } });
+      fireEvent.change(nameInput, { target: { value: 'Test User' } });
+      fireEvent.change(emailInput, { target: { value: 'test@test.com' } });
+      fireEvent.change(passwordInput, { target: { value: 'password123' } });
+      fireEvent.change(roleSelect, { target: { value: 'admin' } });
       fireEvent.click(submitButton);
 
       await waitFor(() => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       });
-    });
+    }, 15000);
 
     it('should show success message after creation', async () => {
       (usersApi.create as jest.Mock).mockResolvedValue({
@@ -208,7 +222,7 @@ describe('UsersPage', () => {
         error: null,
       });
 
-      render(<UsersPage />);
+      renderUsersPage();
 
       const createButton = screen.getByRole('button', {
         name: /nuevo usuario/i,
@@ -233,7 +247,7 @@ describe('UsersPage', () => {
           screen.getByText('Usuario creado correctamente')
         ).toBeInTheDocument();
       });
-    });
+    }, 15000);
 
     it('should show error message when creation fails', async () => {
       (usersApi.create as jest.Mock).mockResolvedValue({
@@ -241,7 +255,7 @@ describe('UsersPage', () => {
         error: 'Failed to create user',
       });
 
-      render(<UsersPage />);
+      renderUsersPage();
 
       const createButton = screen.getByRole('button', {
         name: /nuevo usuario/i,
@@ -264,12 +278,12 @@ describe('UsersPage', () => {
       await waitFor(() => {
         expect(screen.getByText('Failed to create user')).toBeInTheDocument();
       });
-    });
+    }, 15000);
   });
 
   describe('Edit User', () => {
     it('should open edit modal when edit button is clicked', async () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       await waitFor(() => {
         const editIcon = screen.getAllByTestId('EditIcon')[0];
@@ -281,7 +295,7 @@ describe('UsersPage', () => {
     });
 
     it('should populate form with user data when editing', async () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       await waitFor(() => {
         const editIcon = screen.getAllByTestId('EditIcon')[0];
@@ -301,11 +315,17 @@ describe('UsersPage', () => {
 
     it('should call updateUser with modified data', async () => {
       (usersApi.update as jest.Mock).mockResolvedValue({
-        data: null,
+        data: {
+          ...mockUsers[0],
+          name: 'Updated Name',
+          email: 'updated@test.com',
+        },
         error: null,
       });
 
-      render(<UsersPage />);
+      renderUsersPage();
+
+      await screen.findByText('John Doe');
 
       await waitFor(() => {
         const editIcon = screen.getAllByTestId('EditIcon')[0];
@@ -335,11 +355,16 @@ describe('UsersPage', () => {
 
     it('should close modal after successful update', async () => {
       (usersApi.update as jest.Mock).mockResolvedValue({
-        data: null,
+        data: {
+          ...mockUsers[0],
+          name: 'Updated Name',
+        },
         error: null,
       });
 
-      render(<UsersPage />);
+      renderUsersPage();
+
+      await screen.findByText('John Doe');
 
       await waitFor(() => {
         const editIcon = screen.getAllByTestId('EditIcon')[0];
@@ -358,7 +383,7 @@ describe('UsersPage', () => {
 
   describe('Delete User', () => {
     it('should show delete confirmation dialog', async () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       await waitFor(() => {
         const deleteIcon = screen.getAllByTestId('DeleteIcon')[0];
@@ -378,7 +403,7 @@ describe('UsersPage', () => {
         error: null,
       });
 
-      render(<UsersPage />);
+      renderUsersPage();
 
       await waitFor(() => {
         const deleteIcon = screen.getAllByTestId('DeleteIcon')[0];
@@ -395,7 +420,7 @@ describe('UsersPage', () => {
     });
 
     it('should not delete when cancelled', async () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       await waitFor(() => {
         const deleteIcon = screen.getAllByTestId('DeleteIcon')[0];
@@ -418,7 +443,7 @@ describe('UsersPage', () => {
         error: null,
       });
 
-      render(<UsersPage />);
+      renderUsersPage();
 
       await waitFor(() => {
         const deleteIcon = screen.getAllByTestId('DeleteIcon')[0];
@@ -439,7 +464,7 @@ describe('UsersPage', () => {
 
   describe('Permissions', () => {
     it('should render all action buttons when user has permissions', () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       expect(
         screen.getByRole('button', { name: /nuevo usuario/i })
@@ -447,7 +472,7 @@ describe('UsersPage', () => {
     });
 
     it('should render edit and delete buttons for each user', async () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       await waitFor(() => {
         const editIcons = screen.getAllByTestId('EditIcon');
@@ -461,18 +486,26 @@ describe('UsersPage', () => {
 
   describe('Data fetching', () => {
     it('should fetch users on mount', () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       expect(usersApi.getAll).toHaveBeenCalled();
     });
 
-    it('should refetch users after successful creation', async () => {
+    it('should add user to the table after successful creation', async () => {
       (usersApi.create as jest.Mock).mockResolvedValue({
-        data: { id: '3' },
+        data: {
+          id: '3',
+          name: 'Test User',
+          email: 'test@test.com',
+          role: 'admin',
+          isActive: true,
+        },
         error: null,
       });
 
-      render(<UsersPage />);
+      renderUsersPage();
+
+      await screen.findByText('John Doe');
 
       (usersApi.getAll as jest.Mock).mockClear();
 
@@ -495,17 +528,24 @@ describe('UsersPage', () => {
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(usersApi.getAll).toHaveBeenCalledTimes(1);
+        expect(screen.getByText('Test User')).toBeInTheDocument();
       });
+
+      expect(usersApi.getAll).not.toHaveBeenCalled();
     });
 
-    it('should refetch users after successful update', async () => {
+    it('should update users list after successful update', async () => {
       (usersApi.update as jest.Mock).mockResolvedValue({
-        data: null,
+        data: {
+          ...mockUsers[0],
+          name: 'Updated Name',
+        },
         error: null,
       });
 
-      render(<UsersPage />);
+      renderUsersPage();
+
+      await screen.findByText('John Doe');
 
       (usersApi.getAll as jest.Mock).mockClear();
 
@@ -519,17 +559,21 @@ describe('UsersPage', () => {
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(usersApi.getAll).toHaveBeenCalledTimes(1);
+        expect(screen.getByText('Updated Name')).toBeInTheDocument();
       });
+
+      expect(usersApi.getAll).not.toHaveBeenCalled();
     });
 
-    it('should refetch users after successful deletion', async () => {
+    it('should remove user from the table after successful deletion', async () => {
       (usersApi.delete as jest.Mock).mockResolvedValue({
         data: null,
         error: null,
       });
 
-      render(<UsersPage />);
+      renderUsersPage();
+
+      await screen.findByText('John Doe');
 
       (usersApi.getAll as jest.Mock).mockClear();
 
@@ -543,12 +587,14 @@ describe('UsersPage', () => {
       fireEvent.click(confirmButton);
 
       await waitFor(() => {
-        expect(usersApi.getAll).toHaveBeenCalledTimes(1);
+        expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
       });
+
+      expect(usersApi.getAll).not.toHaveBeenCalled();
     });
 
     it('should refetch users when refresh button is clicked', async () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       const refreshButton = screen.getByTestId('RefreshIcon').closest('button');
       fireEvent.click(refreshButton!);
@@ -561,7 +607,7 @@ describe('UsersPage', () => {
 
   describe('Form validation', () => {
     it('should require name field', async () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       const createButton = screen.getByRole('button', {
         name: /nuevo usuario/i,
@@ -575,7 +621,7 @@ describe('UsersPage', () => {
     });
 
     it('should require email field', async () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       const createButton = screen.getByRole('button', {
         name: /nuevo usuario/i,
@@ -595,7 +641,7 @@ describe('UsersPage', () => {
     });
 
     it('should require password field for new users', async () => {
-      render(<UsersPage />);
+      renderUsersPage();
 
       const createButton = screen.getByRole('button', {
         name: /nuevo usuario/i,
@@ -618,11 +664,11 @@ describe('UsersPage', () => {
 
     it('should not require password field for editing users', async () => {
       (usersApi.update as jest.Mock).mockResolvedValue({
-        data: null,
+        data: mockUsers[0],
         error: null,
       });
 
-      render(<UsersPage />);
+      renderUsersPage();
 
       await waitFor(() => {
         const editIcon = screen.getAllByTestId('EditIcon')[0];

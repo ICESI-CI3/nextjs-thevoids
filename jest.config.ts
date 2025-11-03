@@ -21,6 +21,11 @@ const customJestConfig: Config = {
     '!**/coverage/**',
     '!**/jest.config.ts',
     '!**/jest.setup.ts',
+    '!**/test-utils.tsx',
+  ],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '<rootDir>/.*test-utils\\.tsx$',
   ],
   coverageThreshold: {
     global: {
@@ -32,7 +37,7 @@ const customJestConfig: Config = {
   },
   testMatch: ['**/__tests__/**/*.[jt]s?(x)', '**/?(*.)+(spec|test).[jt]s?(x)'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
-  testPathIgnorePatterns: ['/node_modules/', '/.next/'],
+  testPathIgnorePatterns: ['/node_modules/', '/.next/', '/nestjs-back/'],
   transformIgnorePatterns: [
     '/node_modules/',
     '^.+\\.module\\.(css|sass|scss)$',

@@ -9,7 +9,7 @@ import {
 import Roles from './page';
 import { rolesApi } from '@/lib/api/roles';
 import { useAuth } from '@/lib/contexts/AuthContext';
-
+import { DataProvider } from '@/lib/contexts/DataContext';
 jest.mock('@/lib/api/roles', () => ({
   rolesApi: {
     getAll: jest.fn(),
@@ -24,30 +24,56 @@ jest.mock('@/lib/contexts/AuthContext', () => ({
 }));
 
 describe('Roles Page', () => {
+  const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+
   const mockRoles = [
     { id: '1', name: 'admin', description: 'Administrator role' },
     { id: '2', name: 'user', description: 'Regular user role' },
   ];
 
+  const createMockAuthContext = (
+    overrides?: Partial<ReturnType<typeof useAuth>>
+  ) => ({
+    isAuthenticated: true,
+    isLoading: false,
+    token: 'mock-token',
+    user: {
+      id: 'user-1',
+      name: 'Test User',
+      email: 'test@example.com',
+      role: 'ADMIN',
+      isActive: true,
+    },
+    permissions: [],
+    login: jest.fn(),
+    logout: jest.fn(),
+    hasPermission: jest.fn().mockReturnValue(true),
+    ...overrides,
+  });
+
+  const renderRolesPage = () =>
+    render(
+      <DataProvider>
+        <Roles />
+      </DataProvider>
+    );
+
   beforeEach(() => {
     jest.clearAllMocks();
-    (useAuth as jest.Mock).mockReturnValue({
-      isAuthenticated: true,
-    });
+    mockUseAuth.mockReturnValue(createMockAuthContext());
     (rolesApi.getAll as jest.Mock).mockResolvedValue({
       data: mockRoles,
       error: null,
     });
   });
-
   describe('Rendering', () => {
     it('should render the roles page title', () => {
-      render(<Roles />);
+      renderRolesPage();
       expect(screen.getByText('Roles')).toBeInTheDocument();
     });
 
     it('should render create and refresh buttons', () => {
-      render(<Roles />);
+      renderRolesPage();
 
       expect(
         screen.getByRole('button', { name: /nuevo rol/i })
@@ -58,15 +84,14 @@ describe('Roles Page', () => {
       ).toBeInTheDocument();
     });
   });
-
   describe('Data Loading', () => {
     it('should fetch roles on mount', () => {
-      render(<Roles />);
+      renderRolesPage();
       expect(rolesApi.getAll).toHaveBeenCalled();
     });
 
     it('should display roles in the data grid', async () => {
-      render(<Roles />);
+      renderRolesPage();
 
       await waitFor(() => {
         expect(screen.getByText('admin')).toBeInTheDocument();
@@ -82,17 +107,16 @@ describe('Roles Page', () => {
         error: 'Failed to load roles',
       });
 
-      render(<Roles />);
+      renderRolesPage();
 
       await waitFor(() => {
         expect(screen.getByText('Failed to load roles')).toBeInTheDocument();
       });
     });
   });
-
   describe('Create Role', () => {
     it('should open create modal when new role button is clicked', async () => {
-      render(<Roles />);
+      renderRolesPage();
 
       const createButton = screen.getByRole('button', { name: /nuevo rol/i });
       fireEvent.click(createButton);
@@ -108,7 +132,7 @@ describe('Roles Page', () => {
         error: null,
       });
 
-      render(<Roles />);
+      renderRolesPage();
 
       const createButton = screen.getByRole('button', { name: /nuevo rol/i });
       fireEvent.click(createButton);
@@ -146,13 +170,12 @@ describe('Roles Page', () => {
         ).not.toBeInTheDocument();
       });
 
-      expect(rolesApi.getAll).toHaveBeenCalledTimes(2);
+      expect(rolesApi.getAll).toHaveBeenCalledTimes(1);
     });
   });
-
   describe('Refresh Functionality', () => {
     it('should refetch roles when refresh button is clicked', async () => {
-      render(<Roles />);
+      renderRolesPage();
 
       await waitFor(() => {
         expect(rolesApi.getAll).toHaveBeenCalledTimes(1);
@@ -171,11 +194,15 @@ describe('Roles Page', () => {
 
   describe('Authentication', () => {
     it('should not load data when not authenticated', () => {
-      (useAuth as jest.Mock).mockReturnValue({
-        isAuthenticated: false,
-      });
+      mockUseAuth.mockReturnValue(
+        createMockAuthContext({
+          isAuthenticated: false,
+          token: null,
+          user: null,
+        })
+      );
 
-      render(<Roles />);
+      renderRolesPage();
 
       expect(rolesApi.getAll).not.toHaveBeenCalled();
     });

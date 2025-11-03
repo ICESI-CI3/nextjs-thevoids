@@ -16,15 +16,32 @@ jest.mock('@/lib/contexts/AuthContext', () => ({
 describe('HomePage', () => {
   const mockPush = jest.fn();
 
+  const createMockAuthContext = (
+    overrides: Partial<ReturnType<typeof useAuth>> = {}
+  ) => ({
+    isAuthenticated: true,
+    isLoading: false,
+    token: 'mock-token',
+    user: {
+      id: '1',
+      name: 'Test User',
+      email: 'test@example.com',
+      role: 'ADMIN',
+      isActive: true,
+    },
+    permissions: [],
+    login: jest.fn(),
+    logout: jest.fn(),
+    hasPermission: jest.fn().mockReturnValue(true),
+    ...overrides,
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue({
       push: mockPush,
     });
-    (useAuth as jest.Mock).mockReturnValue({
-      isAuthenticated: true,
-      user: { id: 1, name: 'Test User' },
-    });
+    (useAuth as jest.Mock).mockReturnValue(createMockAuthContext());
   });
 
   describe('Rendering', () => {
@@ -32,34 +49,55 @@ describe('HomePage', () => {
       render(<HomePage />);
 
       expect(screen.getByText(/HabitHive/i)).toBeInTheDocument();
-      expect(screen.getByText('Usuarios')).toBeInTheDocument();
-      expect(screen.getByText('Roles')).toBeInTheDocument();
-      expect(screen.getByText('Permisos')).toBeInTheDocument();
-      expect(screen.getByText('Permisos de Rol')).toBeInTheDocument();
+      const cardTitles = [
+        'Usuarios',
+        'Roles',
+        'Permisos',
+        'Permisos de Rol',
+        'Colmenas',
+        'Hábitos',
+        'Progresos',
+        'Pagos',
+        'Transacciones',
+        'Cerrar Sesión',
+      ];
+
+      cardTitles.forEach(title => {
+        expect(screen.getByText(title)).toBeInTheDocument();
+      });
     });
 
     it('should render card descriptions', () => {
       render(<HomePage />);
 
-      expect(
-        screen.getByText('Gestionar usuarios del sistema')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText('Administrar roles y permisos')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText('Configurar permisos del sistema')
-      ).toBeInTheDocument();
-      expect(screen.getByText('Asignar permisos a roles')).toBeInTheDocument();
+      const descriptions = [
+        'Gestionar usuarios del sistema',
+        'Administrar roles y permisos',
+        'Configurar permisos del sistema',
+        'Asignar permisos a roles',
+        'Gestionar colmenas y hábitos',
+        'Administrar tus hábitos',
+        'Ver y analizar tu progreso',
+        'Gestionar pagos y suscripciones',
+        'Ver historial de transacciones',
+        'Salir de tu cuenta',
+      ];
+
+      descriptions.forEach(description => {
+        expect(screen.getByText(description)).toBeInTheDocument();
+      });
     });
   });
 
   describe('Navigation', () => {
     it('should redirect to login if not authenticated', () => {
-      (useAuth as jest.Mock).mockReturnValue({
-        isAuthenticated: false,
-        user: null,
-      });
+      (useAuth as jest.Mock).mockReturnValue(
+        createMockAuthContext({
+          isAuthenticated: false,
+          user: null,
+          token: null,
+        })
+      );
 
       render(<HomePage />);
 
@@ -118,7 +156,7 @@ describe('HomePage', () => {
       render(<HomePage />);
 
       const cards = screen.getAllByRole('button');
-      expect(cards).toHaveLength(4);
+      expect(cards).toHaveLength(10);
 
       cards.forEach(card => {
         expect(card).toBeInTheDocument();
@@ -128,16 +166,22 @@ describe('HomePage', () => {
     it('should have descriptive text for each card', () => {
       render(<HomePage />);
 
-      expect(
-        screen.getByText('Gestionar usuarios del sistema')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText('Administrar roles y permisos')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText('Configurar permisos del sistema')
-      ).toBeInTheDocument();
-      expect(screen.getByText('Asignar permisos a roles')).toBeInTheDocument();
+      const descriptions = [
+        'Gestionar usuarios del sistema',
+        'Administrar roles y permisos',
+        'Configurar permisos del sistema',
+        'Asignar permisos a roles',
+        'Gestionar colmenas y hábitos',
+        'Administrar tus hábitos',
+        'Ver y analizar tu progreso',
+        'Gestionar pagos y suscripciones',
+        'Ver historial de transacciones',
+        'Salir de tu cuenta',
+      ];
+
+      descriptions.forEach(description => {
+        expect(screen.getByText(description)).toBeInTheDocument();
+      });
     });
   });
 });

@@ -68,7 +68,7 @@ describe('LoginPage', () => {
 
       render(<LoginPage />);
 
-      expect(mockPush).toHaveBeenCalledWith('/users');
+      expect(mockPush).toHaveBeenCalledWith('/');
     });
 
     it('should not redirect when not authenticated', () => {
@@ -130,7 +130,7 @@ describe('LoginPage', () => {
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/users');
+        expect(mockPush).toHaveBeenCalledWith('/');
       });
     });
 

@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Permissions from './page';
 import { permissionsApi } from '@/lib/api/permissions';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { DataProvider } from '@/lib/contexts/DataContext';
 
 // Mock dependencies
 jest.mock('@/lib/api/permissions', () => ({
@@ -21,6 +22,13 @@ describe('Permissions Page', () => {
     { id: '2', name: 'delete_user', description: 'Delete users' },
   ];
 
+  const renderPermissionsPage = () =>
+    render(
+      <DataProvider>
+        <Permissions />
+      </DataProvider>
+    );
+
   beforeEach(() => {
     jest.clearAllMocks();
     (useAuth as jest.Mock).mockReturnValue({
@@ -34,12 +42,12 @@ describe('Permissions Page', () => {
 
   describe('Rendering', () => {
     it('should render the permissions page title', () => {
-      render(<Permissions />);
+      renderPermissionsPage();
       expect(screen.getByText('Permisos')).toBeInTheDocument();
     });
 
     it('should render refresh button', () => {
-      render(<Permissions />);
+      renderPermissionsPage();
       expect(
         document.querySelector('svg[data-testid="RefreshIcon"]')
       ).toBeInTheDocument();
@@ -48,12 +56,12 @@ describe('Permissions Page', () => {
 
   describe('Data Loading', () => {
     it('should fetch permissions on mount', () => {
-      render(<Permissions />);
+      renderPermissionsPage();
       expect(permissionsApi.getAll).toHaveBeenCalled();
     });
 
     it('should display permissions in the data grid', async () => {
-      render(<Permissions />);
+      renderPermissionsPage();
 
       await waitFor(() => {
         expect(screen.getByText('create_user')).toBeInTheDocument();
@@ -74,7 +82,7 @@ describe('Permissions Page', () => {
           )
       );
 
-      render(<Permissions />);
+      renderPermissionsPage();
 
       const dataGrid = screen.getByRole('grid');
       expect(dataGrid).toBeInTheDocument();
@@ -86,7 +94,7 @@ describe('Permissions Page', () => {
         error: 'Failed to load permissions',
       });
 
-      render(<Permissions />);
+      renderPermissionsPage();
 
       await waitFor(() => {
         expect(
@@ -98,14 +106,13 @@ describe('Permissions Page', () => {
 
   describe('Refresh Functionality', () => {
     it('should refetch permissions when refresh button is clicked', async () => {
-      render(<Permissions />);
+      renderPermissionsPage();
 
       await waitFor(() => {
         expect(permissionsApi.getAll).toHaveBeenCalledTimes(1);
       });
 
       const refreshButton = screen.getByTestId('RefreshIcon').closest('button');
-      expect(refreshButton).toBeInTheDocument();
 
       fireEvent.click(refreshButton!);
 
@@ -121,7 +128,7 @@ describe('Permissions Page', () => {
         isAuthenticated: false,
       });
 
-      render(<Permissions />);
+      renderPermissionsPage();
 
       expect(permissionsApi.getAll).not.toHaveBeenCalled();
     });

@@ -1,7 +1,22 @@
+global.fetch = jest.fn();
 import { ApiClient, apiClient } from './client';
 
 // Mock fetch globally
 global.fetch = jest.fn();
+const fetchMock = global.fetch as jest.Mock;
+
+const createResponse = (
+  status: number,
+  body?: Record<string, unknown>,
+  ok = true
+) => ({
+  ok,
+  status,
+  headers: new Headers(
+    body ? { 'content-type': 'application/json' } : undefined
+  ),
+  json: async () => body,
+});
 
 describe('ApiClient', () => {
   let client: ApiClient;
@@ -26,23 +41,20 @@ describe('ApiClient', () => {
   describe('request method', () => {
     it('should make successful GET request', async () => {
       const mockData = { id: 1, name: 'Test' };
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockData,
-      });
+      fetchMock.mockResolvedValueOnce(createResponse(200, mockData));
 
       const response = await client.get('/test');
 
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(fetchMock).toHaveBeenCalledWith(
         'http://test-api.com/test',
-        expect.objectContaining({
-          method: 'GET',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-          }),
-        })
+        expect.any(Object)
       );
+
+      const [, options] = fetchMock.mock.calls[0];
+      const headers = options.headers as Headers;
+
+      expect(options.method).toBe('GET');
+      expect(headers.get('Content-Type')).toBe('application/json');
 
       expect(response).toEqual({
         status: 200,
@@ -54,30 +66,19 @@ describe('ApiClient', () => {
       localStorage.setItem('token', 'test-token');
 
       const mockData = { id: 1 };
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockData,
-      });
+      fetchMock.mockResolvedValueOnce(createResponse(200, mockData));
 
       await client.get('/test');
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://test-api.com/test',
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer test-token',
-          }),
-        })
-      );
+      const [, options] = fetchMock.mock.calls[0];
+      const headers = options.headers as Headers;
+
+      expect(headers.get('Content-Type')).toBe('application/json');
+      expect(headers.get('Authorization')).toBe('Bearer test-token');
     });
 
     it('should handle 204 No Content response', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 204,
-      });
+      fetchMock.mockResolvedValueOnce(createResponse(204));
 
       const response = await client.delete('/test/1');
 
@@ -88,11 +89,9 @@ describe('ApiClient', () => {
     });
 
     it('should handle 400 Bad Request error', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        json: async () => ({ message: 'Invalid data' }),
-      });
+      fetchMock.mockResolvedValueOnce(
+        createResponse(400, { message: 'Invalid data' }, false)
+      );
 
       const response = await client.post('/test', { invalid: 'data' });
 
@@ -103,11 +102,9 @@ describe('ApiClient', () => {
     });
 
     it('should handle 401 Unauthorized error', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 401,
-        json: async () => ({ message: 'Unauthorized' }),
-      });
+      fetchMock.mockResolvedValueOnce(
+        createResponse(401, { message: 'Unauthorized' }, false)
+      );
 
       const response = await client.get('/protected');
 
@@ -118,11 +115,9 @@ describe('ApiClient', () => {
     });
 
     it('should handle 403 Forbidden error', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 403,
-        json: async () => ({ message: 'Forbidden' }),
-      });
+      fetchMock.mockResolvedValueOnce(
+        createResponse(403, { message: 'Forbidden' }, false)
+      );
 
       const response = await client.delete('/admin/user/1');
 
@@ -133,11 +128,9 @@ describe('ApiClient', () => {
     });
 
     it('should handle 404 Not Found error', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        json: async () => ({ message: 'Not found' }),
-      });
+      fetchMock.mockResolvedValueOnce(
+        createResponse(404, { message: 'Not found' }, false)
+      );
 
       const response = await client.get('/not-exist');
 
@@ -148,11 +141,9 @@ describe('ApiClient', () => {
     });
 
     it('should handle 409 Conflict error', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 409,
-        json: async () => ({ message: 'Email already exists' }),
-      });
+      fetchMock.mockResolvedValueOnce(
+        createResponse(409, { message: 'Email already exists' }, false)
+      );
 
       const response = await client.post('/users', {
         email: 'duplicate@test.com',
@@ -165,11 +156,9 @@ describe('ApiClient', () => {
     });
 
     it('should handle 500 Internal Server Error', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        json: async () => ({ message: 'Server error' }),
-      });
+      fetchMock.mockResolvedValueOnce(
+        createResponse(500, { message: 'Server error' }, false)
+      );
 
       const response = await client.get('/test');
 
@@ -180,9 +169,7 @@ describe('ApiClient', () => {
     });
 
     it('should handle network errors', async () => {
-      (global.fetch as jest.Mock).mockRejectedValueOnce(
-        new Error('Network failure')
-      );
+      fetchMock.mockRejectedValueOnce(new Error('Network failure'));
 
       const response = await client.get('/test');
 
@@ -193,7 +180,7 @@ describe('ApiClient', () => {
     });
 
     it('should handle non-Error exceptions', async () => {
-      (global.fetch as jest.Mock).mockRejectedValueOnce('String error');
+      fetchMock.mockRejectedValueOnce('String error');
 
       const response = await client.get('/test');
 
@@ -209,21 +196,13 @@ describe('ApiClient', () => {
       const mockData = { id: 1, name: 'Created' };
       const postData = { name: 'New Item' };
 
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 201,
-        json: async () => mockData,
-      });
+      fetchMock.mockResolvedValueOnce(createResponse(201, mockData));
 
       const response = await client.post('/items', postData);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://test-api.com/items',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify(postData),
-        })
-      );
+      const [, options] = fetchMock.mock.calls[0];
+      expect(options.method).toBe('POST');
+      expect(options.body).toBe(JSON.stringify(postData));
 
       expect(response.data).toEqual(mockData);
     });
@@ -232,69 +211,42 @@ describe('ApiClient', () => {
       const mockData = { id: 1, name: 'Updated' };
       const patchData = { name: 'Updated Item' };
 
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => mockData,
-      });
+      fetchMock.mockResolvedValueOnce(createResponse(200, mockData));
 
       const response = await client.patch('/items/1', patchData);
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://test-api.com/items/1',
-        expect.objectContaining({
-          method: 'PATCH',
-          body: JSON.stringify(patchData),
-        })
-      );
+      const [, options] = fetchMock.mock.calls[0];
+      expect(options.method).toBe('PATCH');
+      expect(options.body).toBe(JSON.stringify(patchData));
 
       expect(response.data).toEqual(mockData);
     });
 
     it('should make DELETE request', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 204,
-      });
+      fetchMock.mockResolvedValueOnce(createResponse(204));
 
       const response = await client.delete('/items/1');
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://test-api.com/items/1',
-        expect.objectContaining({
-          method: 'DELETE',
-        })
-      );
+      const [, options] = fetchMock.mock.calls[0];
+      expect(options.method).toBe('DELETE');
 
       expect(response.status).toBe(204);
     });
 
     it('should make POST request without body', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ success: true }),
-      });
+      fetchMock.mockResolvedValueOnce(createResponse(200, { success: true }));
 
       await client.post('/action');
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://test-api.com/action',
-        expect.objectContaining({
-          method: 'POST',
-          body: undefined,
-        })
-      );
+      const [, options] = fetchMock.mock.calls[0];
+      expect(options.method).toBe('POST');
+      expect(options.body).toBeUndefined();
     });
   });
 
   describe('error message handling', () => {
     it('should use default message for 409 when API message is missing', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 409,
-        json: async () => ({}),
-      });
+      fetchMock.mockResolvedValueOnce(createResponse(409, {}, false));
 
       const response = await client.post('/test', {});
 
@@ -304,11 +256,7 @@ describe('ApiClient', () => {
     });
 
     it('should use default message for 404 when API message is missing', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        json: async () => ({}),
-      });
+      fetchMock.mockResolvedValueOnce(createResponse(404, {}, false));
 
       const response = await client.get('/test');
 
@@ -316,11 +264,7 @@ describe('ApiClient', () => {
     });
 
     it('should use default message for 400 when API message is missing', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        json: async () => ({}),
-      });
+      fetchMock.mockResolvedValueOnce(createResponse(400, {}, false));
 
       const response = await client.post('/test', {});
 
@@ -328,11 +272,7 @@ describe('ApiClient', () => {
     });
 
     it('should use generic error for unknown status codes', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 418, // I'm a teapot
-        json: async () => ({}),
-      });
+      fetchMock.mockResolvedValueOnce(createResponse(418, {}, false));
 
       const response = await client.get('/test');
 
