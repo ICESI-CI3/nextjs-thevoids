@@ -1,39 +1,28 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Box, Typography, Alert, IconButton } from '@mui/material';
 import { Refresh } from '@mui/icons-material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { permissionsApi, Permission } from '@/lib/api/permissions';
+import { Permission } from '@/lib/api/permissions';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useData } from '@/lib/contexts/DataContext';
 
 export default function Permissions() {
-  const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-
   const { isAuthenticated } = useAuth();
+  const { state, fetchPermissions, setPermissionsError } = useData();
   const hasLoadedRef = useRef(false);
 
-  const loadPermissions = useCallback(async () => {
-    setIsLoading(true);
-    setError('');
-    const response = await permissionsApi.getAll();
-    if (response.error) {
-      setError(response.error);
-    } else if (response.data) {
-      setPermissions(response.data);
-    }
-    setIsLoading(false);
-  }, []);
+  const permissions = state.permissions as Permission[];
+  const isLoading = state.loading.permissions;
+  const error = state.errors.permissions;
 
   useEffect(() => {
     if (isAuthenticated && !hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadPermissions();
+      fetchPermissions();
     }
-  }, [isAuthenticated, loadPermissions]);
+  }, [fetchPermissions, isAuthenticated]);
 
   const columns: GridColDef[] = [
     { field: 'name', headerName: 'Nombre', flex: 1, minWidth: 200 },
@@ -54,14 +43,18 @@ export default function Permissions() {
           Permisos
         </Typography>
         <Box>
-          <IconButton onClick={loadPermissions} sx={{ mr: 1 }}>
+          <IconButton onClick={() => fetchPermissions()} sx={{ mr: 1 }}>
             <Refresh />
           </IconButton>
         </Box>
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setPermissionsError(null)}
+        >
           {error}
         </Alert>
       )}

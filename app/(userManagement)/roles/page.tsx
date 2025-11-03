@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Button,
@@ -15,13 +15,11 @@ import {
 } from '@mui/material';
 import { Add, Edit, Delete, Refresh } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
-import { rolesApi, Role, CreateRoleDto, UpdateRoleDto } from '@/lib/api/roles';
+import { Role } from '@/lib/api/roles';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useData } from '@/lib/contexts/DataContext';
 
 export default function Roles() {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -33,27 +31,26 @@ export default function Roles() {
   });
 
   const { isAuthenticated } = useAuth();
+  const {
+    state,
+    fetchRoles,
+    createRoleAsync,
+    updateRoleAsync,
+    deleteRoleAsync,
+    setRolesError,
+  } = useData();
   const hasLoadedRef = useRef(false);
 
-  const loadRoles = useCallback(async () => {
-    setIsLoading(true);
-    setError('');
-    const response = await rolesApi.getAll();
-    if (response.error) {
-      setError(response.error);
-    } else if (response.data) {
-      setRoles(response.data);
-    }
-    setIsLoading(false);
-  }, []);
+  const roles = state.roles;
+  const isLoading = state.loading.roles;
+  const error = state.errors.roles;
 
   useEffect(() => {
     if (isAuthenticated && !hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadRoles();
+      fetchRoles();
     }
-  }, [isAuthenticated, loadRoles]);
+  }, [fetchRoles, isAuthenticated]);
 
   const handleOpenDialog = (role?: Role) => {
     if (role) {
@@ -82,47 +79,42 @@ export default function Roles() {
   };
 
   const handleSubmit = async () => {
-    setError('');
+    setRolesError(null);
     setSuccess('');
 
     if (editingRole) {
-      const updateData: UpdateRoleDto = formData;
-      const response = await rolesApi.update(editingRole.id, updateData);
-      if (response.error) {
-        setError(response.error);
-      } else {
-        setSuccess('Rol actualizado correctamente');
-        handleCloseDialog();
-        loadRoles();
+      const result = await updateRoleAsync(editingRole.id, formData);
+      if (!result.success) {
+        return;
       }
+
+      setSuccess('Rol actualizado correctamente');
+      handleCloseDialog();
     } else {
-      const createData: CreateRoleDto = formData;
-      const response = await rolesApi.create(createData);
-      if (response.error) {
-        setError(response.error);
-      } else {
-        setSuccess('Rol creado correctamente');
-        handleCloseDialog();
-        loadRoles();
+      const result = await createRoleAsync(formData);
+      if (!result.success) {
+        return;
       }
+
+      setSuccess('Rol creado correctamente');
+      handleCloseDialog();
     }
   };
 
   const confirmDelete = async () => {
     if (!roleToDelete) return;
-    setError('');
+    setRolesError(null);
     setSuccess('');
-    const response = await rolesApi.delete(roleToDelete.id);
-    if (response.error) {
-      setError(response.error);
+    const result = await deleteRoleAsync(roleToDelete.id);
+    if (!result.success) {
       setDeleteDialogOpen(false);
       setRoleToDelete(null);
-    } else {
-      setSuccess('Rol eliminado correctamente');
-      setDeleteDialogOpen(false);
-      setRoleToDelete(null);
-      loadRoles();
+      return;
     }
+
+    setSuccess('Rol eliminado correctamente');
+    setDeleteDialogOpen(false);
+    setRoleToDelete(null);
   };
 
   const columns: GridColDef[] = [
@@ -167,7 +159,7 @@ export default function Roles() {
           Roles
         </Typography>
         <Box>
-          <IconButton onClick={loadRoles} sx={{ mr: 1 }}>
+          <IconButton onClick={() => fetchRoles()} sx={{ mr: 1 }}>
             <Refresh />
           </IconButton>
           <Button
@@ -181,7 +173,11 @@ export default function Roles() {
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setRolesError(null)}
+        >
           {error}
         </Alert>
       )}

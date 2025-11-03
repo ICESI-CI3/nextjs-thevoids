@@ -6,10 +6,14 @@ import React, {
   useReducer,
   useCallback,
 } from 'react';
-import { User } from '../api/users';
-import { Role } from '../api/roles';
-import { Permission } from '../api/permissions';
-import { RolePermission } from '../api/rolePermissions';
+import { usersApi, User, CreateUserDto, UpdateUserDto } from '../api/users';
+import { rolesApi, Role, CreateRoleDto, UpdateRoleDto } from '../api/roles';
+import { permissionsApi, Permission } from '../api/permissions';
+import {
+  rolePermissionsApi,
+  RolePermission,
+  CreateRolePermissionDto,
+} from '../api/rolePermissions';
 
 // State interface
 interface DataState {
@@ -62,6 +66,12 @@ type DataAction =
   | { type: 'SET_ROLE_PERMISSIONS_ERROR'; payload: string | null }
   // Reset
   | { type: 'RESET_ALL' };
+
+interface OperationResult<T = void> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
 
 // Initial state
 const initialState: DataState = {
@@ -200,20 +210,43 @@ interface DataContextType {
   deleteUser: (id: string) => void;
   setUsersLoading: (loading: boolean) => void;
   setUsersError: (error: string | null) => void;
+  fetchUsers: () => Promise<OperationResult<User[]>>;
+  createUserAsync: (user: CreateUserDto) => Promise<OperationResult<User>>;
+  updateUserAsync: (
+    id: string,
+    user: UpdateUserDto
+  ) => Promise<OperationResult<User>>;
+  deleteUserAsync: (id: string) => Promise<OperationResult<void>>;
   setRoles: (roles: Role[]) => void;
   addRole: (role: Role) => void;
   updateRole: (role: Role) => void;
   deleteRole: (id: string) => void;
   setRolesLoading: (loading: boolean) => void;
   setRolesError: (error: string | null) => void;
+  fetchRoles: () => Promise<OperationResult<Role[]>>;
+  createRoleAsync: (role: CreateRoleDto) => Promise<OperationResult<Role>>;
+  updateRoleAsync: (
+    id: string,
+    role: UpdateRoleDto
+  ) => Promise<OperationResult<Role>>;
+  deleteRoleAsync: (id: string) => Promise<OperationResult<void>>;
   setPermissions: (permissions: Permission[]) => void;
   setPermissionsLoading: (loading: boolean) => void;
   setPermissionsError: (error: string | null) => void;
+  fetchPermissions: () => Promise<OperationResult<Permission[]>>;
   setRolePermissions: (rolePermissions: RolePermission[]) => void;
   addRolePermission: (rolePermission: RolePermission) => void;
   deleteRolePermission: (roleId: string, permissionId: string) => void;
   setRolePermissionsLoading: (loading: boolean) => void;
   setRolePermissionsError: (error: string | null) => void;
+  fetchRolePermissions: () => Promise<OperationResult<RolePermission[]>>;
+  createRolePermissionAsync: (
+    rolePermission: CreateRolePermissionDto
+  ) => Promise<OperationResult<RolePermission>>;
+  deleteRolePermissionAsync: (
+    roleId: string,
+    permissionId: string
+  ) => Promise<OperationResult<void>>;
   resetAll: () => void;
 }
 
@@ -314,6 +347,342 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     dispatch({ type: 'SET_ROLE_PERMISSIONS_ERROR', payload: error });
   }, []);
 
+  const fetchUsers = useCallback(async (): Promise<OperationResult<User[]>> => {
+    setUsersLoading(true);
+    setUsersError(null);
+    try {
+      const response = await usersApi.getAll();
+      if (response.error || !response.data) {
+        const message =
+          response.error || 'No se pudo cargar la lista de usuarios';
+        setUsers([]);
+        setUsersError(message);
+        return { success: false, error: message };
+      }
+
+      setUsers(response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo cargar la lista de usuarios';
+      setUsersError(message);
+      return { success: false, error: message };
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [setUsers, setUsersError, setUsersLoading]);
+
+  const createUserAsync = useCallback(
+    async (data: CreateUserDto): Promise<OperationResult<User>> => {
+      setUsersError(null);
+      setUsersLoading(true);
+      try {
+        const response = await usersApi.create(data);
+        if (response.error || !response.data) {
+          const message = response.error || 'No se pudo crear el usuario';
+          setUsersError(message);
+          return { success: false, error: message };
+        }
+
+        addUser(response.data);
+        return { success: true, data: response.data };
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'No se pudo crear el usuario';
+        setUsersError(message);
+        return { success: false, error: message };
+      } finally {
+        setUsersLoading(false);
+      }
+    },
+    [addUser, setUsersError, setUsersLoading]
+  );
+
+  const updateUserAsync = useCallback(
+    async (id: string, data: UpdateUserDto): Promise<OperationResult<User>> => {
+      setUsersError(null);
+      setUsersLoading(true);
+      try {
+        const response = await usersApi.update(id, data);
+        if (response.error || !response.data) {
+          const message = response.error || 'No se pudo actualizar el usuario';
+          setUsersError(message);
+          return { success: false, error: message };
+        }
+
+        updateUser(response.data);
+        return { success: true, data: response.data };
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'No se pudo actualizar el usuario';
+        setUsersError(message);
+        return { success: false, error: message };
+      } finally {
+        setUsersLoading(false);
+      }
+    },
+    [setUsersError, setUsersLoading, updateUser]
+  );
+
+  const deleteUserAsync = useCallback(
+    async (id: string): Promise<OperationResult<void>> => {
+      setUsersError(null);
+      setUsersLoading(true);
+      try {
+        const response = await usersApi.delete(id);
+        if (response.error) {
+          const message = response.error || 'No se pudo eliminar el usuario';
+          setUsersError(message);
+          return { success: false, error: message };
+        }
+
+        deleteUser(id);
+        return { success: true };
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'No se pudo eliminar el usuario';
+        setUsersError(message);
+        return { success: false, error: message };
+      } finally {
+        setUsersLoading(false);
+      }
+    },
+    [deleteUser, setUsersError, setUsersLoading]
+  );
+
+  const fetchRoles = useCallback(async (): Promise<OperationResult<Role[]>> => {
+    setRolesLoading(true);
+    setRolesError(null);
+    try {
+      const response = await rolesApi.getAll();
+      if (response.error || !response.data) {
+        const message = response.error || 'No se pudieron cargar los roles';
+        setRoles([]);
+        setRolesError(message);
+        return { success: false, error: message };
+      }
+
+      setRoles(response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudieron cargar los roles';
+      setRolesError(message);
+      return { success: false, error: message };
+    } finally {
+      setRolesLoading(false);
+    }
+  }, [setRoles, setRolesError, setRolesLoading]);
+
+  const createRoleAsync = useCallback(
+    async (data: CreateRoleDto): Promise<OperationResult<Role>> => {
+      setRolesError(null);
+      setRolesLoading(true);
+      try {
+        const response = await rolesApi.create(data);
+        if (response.error || !response.data) {
+          const message = response.error || 'No se pudo crear el rol';
+          setRolesError(message);
+          return { success: false, error: message };
+        }
+
+        addRole(response.data);
+        return { success: true, data: response.data };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'No se pudo crear el rol';
+        setRolesError(message);
+        return { success: false, error: message };
+      } finally {
+        setRolesLoading(false);
+      }
+    },
+    [addRole, setRolesError, setRolesLoading]
+  );
+
+  const updateRoleAsync = useCallback(
+    async (id: string, data: UpdateRoleDto): Promise<OperationResult<Role>> => {
+      setRolesError(null);
+      setRolesLoading(true);
+      try {
+        const response = await rolesApi.update(id, data);
+        if (response.error || !response.data) {
+          const message = response.error || 'No se pudo actualizar el rol';
+          setRolesError(message);
+          return { success: false, error: message };
+        }
+
+        updateRole(response.data);
+        return { success: true, data: response.data };
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'No se pudo actualizar el rol';
+        setRolesError(message);
+        return { success: false, error: message };
+      } finally {
+        setRolesLoading(false);
+      }
+    },
+    [setRolesError, setRolesLoading, updateRole]
+  );
+
+  const deleteRoleAsync = useCallback(
+    async (id: string): Promise<OperationResult<void>> => {
+      setRolesError(null);
+      setRolesLoading(true);
+      try {
+        const response = await rolesApi.delete(id);
+        if (response.error) {
+          const message = response.error || 'No se pudo eliminar el rol';
+          setRolesError(message);
+          return { success: false, error: message };
+        }
+
+        deleteRole(id);
+        return { success: true };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'No se pudo eliminar el rol';
+        setRolesError(message);
+        return { success: false, error: message };
+      } finally {
+        setRolesLoading(false);
+      }
+    },
+    [deleteRole, setRolesError, setRolesLoading]
+  );
+
+  const fetchPermissions = useCallback(async (): Promise<
+    OperationResult<Permission[]>
+  > => {
+    setPermissionsLoading(true);
+    setPermissionsError(null);
+    try {
+      const response = await permissionsApi.getAll();
+      if (response.error || !response.data) {
+        const message = response.error || 'No se pudieron cargar los permisos';
+        setPermissions([]);
+        setPermissionsError(message);
+        return { success: false, error: message };
+      }
+
+      setPermissions(response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudieron cargar los permisos';
+      setPermissionsError(message);
+      return { success: false, error: message };
+    } finally {
+      setPermissionsLoading(false);
+    }
+  }, [setPermissions, setPermissionsError, setPermissionsLoading]);
+
+  const fetchRolePermissions = useCallback(async (): Promise<
+    OperationResult<RolePermission[]>
+  > => {
+    setRolePermissionsLoading(true);
+    setRolePermissionsError(null);
+    try {
+      const response = await rolePermissionsApi.getAll();
+      if (response.error || !response.data) {
+        const message =
+          response.error || 'No se pudieron cargar las asignaciones';
+        setRolePermissions([]);
+        setRolePermissionsError(message);
+        return { success: false, error: message };
+      }
+
+      setRolePermissions(response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudieron cargar las asignaciones';
+      setRolePermissionsError(message);
+      return { success: false, error: message };
+    } finally {
+      setRolePermissionsLoading(false);
+    }
+  }, [setRolePermissions, setRolePermissionsError, setRolePermissionsLoading]);
+
+  const createRolePermissionAsync = useCallback(
+    async (
+      data: CreateRolePermissionDto
+    ): Promise<OperationResult<RolePermission>> => {
+      setRolePermissionsError(null);
+      setRolePermissionsLoading(true);
+      try {
+        const response = await rolePermissionsApi.create(data);
+        if (response.error || !response.data) {
+          const message =
+            response.error || 'No se pudo asignar el permiso al rol';
+          setRolePermissionsError(message);
+          return { success: false, error: message };
+        }
+
+        addRolePermission(response.data);
+        return { success: true, data: response.data };
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'No se pudo asignar el permiso al rol';
+        setRolePermissionsError(message);
+        return { success: false, error: message };
+      } finally {
+        setRolePermissionsLoading(false);
+      }
+    },
+    [addRolePermission, setRolePermissionsError, setRolePermissionsLoading]
+  );
+
+  const deleteRolePermissionAsync = useCallback(
+    async (
+      roleId: string,
+      permissionId: string
+    ): Promise<OperationResult<void>> => {
+      setRolePermissionsError(null);
+      setRolePermissionsLoading(true);
+      try {
+        const response = await rolePermissionsApi.delete(roleId, permissionId);
+        if (response.error) {
+          const message = response.error || 'No se pudo eliminar la asignación';
+          setRolePermissionsError(message);
+          return { success: false, error: message };
+        }
+
+        deleteRolePermission(roleId, permissionId);
+        return { success: true };
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'No se pudo eliminar la asignación';
+        setRolePermissionsError(message);
+        return { success: false, error: message };
+      } finally {
+        setRolePermissionsLoading(false);
+      }
+    },
+    [deleteRolePermission, setRolePermissionsError, setRolePermissionsLoading]
+  );
+
   const resetAll = useCallback(() => {
     dispatch({ type: 'RESET_ALL' });
   }, []);
@@ -329,20 +698,32 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         deleteUser,
         setUsersLoading,
         setUsersError,
+        fetchUsers,
+        createUserAsync,
+        updateUserAsync,
+        deleteUserAsync,
         setRoles,
         addRole,
         updateRole,
         deleteRole,
         setRolesLoading,
         setRolesError,
+        fetchRoles,
+        createRoleAsync,
+        updateRoleAsync,
+        deleteRoleAsync,
         setPermissions,
         setPermissionsLoading,
         setPermissionsError,
+        fetchPermissions,
         setRolePermissions,
         addRolePermission,
         deleteRolePermission,
         setRolePermissionsLoading,
         setRolePermissionsError,
+        fetchRolePermissions,
+        createRolePermissionAsync,
+        deleteRolePermissionAsync,
         resetAll,
       }}
     >

@@ -17,20 +17,15 @@ import {
 import { Add, Delete, Refresh } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import {
-  rolePermissionsApi,
   RolePermission,
   CreateRolePermissionDto,
 } from '@/lib/api/rolePermissions';
-import { rolesApi, Role } from '@/lib/api/roles';
-import { permissionsApi, Permission } from '@/lib/api/permissions';
+import { Role } from '@/lib/api/roles';
+import { Permission } from '@/lib/api/permissions';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useData } from '@/lib/contexts/DataContext';
 
 export default function RolePermissions() {
-  const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -41,35 +36,27 @@ export default function RolePermissions() {
     useState<RolePermission | null>(null);
 
   const { isAuthenticated } = useAuth();
+  const {
+    state,
+    fetchRolePermissions,
+    fetchRoles,
+    fetchPermissions,
+    createRolePermissionAsync,
+    deleteRolePermissionAsync,
+    setRolePermissionsError,
+    setRolesError,
+    setPermissionsError,
+  } = useData();
   const hasLoadedRef = useRef(false);
 
   const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError('');
-
-    const [rolePermissionsResponse, rolesResponse, permissionsResponse] =
-      await Promise.all([
-        rolePermissionsApi.getAll(),
-        rolesApi.getAll(),
-        permissionsApi.getAll(),
-      ]);
-
-    if (rolePermissionsResponse.error) {
-      setError(rolePermissionsResponse.error);
-    } else if (rolePermissionsResponse.data) {
-      setRolePermissions(rolePermissionsResponse.data);
-    }
-
-    if (rolesResponse.data) {
-      setRoles(rolesResponse.data);
-    }
-
-    if (permissionsResponse.data) {
-      setPermissions(permissionsResponse.data);
-    }
-
-    setIsLoading(false);
-  }, []);
+    setSuccess('');
+    await Promise.all([
+      fetchRolePermissions(),
+      fetchRoles(),
+      fetchPermissions(),
+    ]);
+  }, [fetchPermissions, fetchRolePermissions, fetchRoles]);
 
   useEffect(() => {
     if (isAuthenticated && !hasLoadedRef.current) {
@@ -93,11 +80,11 @@ export default function RolePermissions() {
 
   const handleSubmit = async () => {
     if (!selectedRole || !selectedPermission) {
-      setError('Debe seleccionar un rol y un permiso');
+      setRolePermissionsError('Debe seleccionar un rol y un permiso');
       return;
     }
 
-    setError('');
+    setRolePermissionsError(null);
     setSuccess('');
 
     const createData: CreateRolePermissionDto = {
@@ -105,35 +92,45 @@ export default function RolePermissions() {
       permissionId: selectedPermission.id,
     };
 
-    const response = await rolePermissionsApi.create(createData);
-    if (response.error) {
-      setError(response.error);
-    } else {
-      setSuccess('Permiso asignado al rol correctamente');
-      handleCloseDialog();
-      loadData();
+    const result = await createRolePermissionAsync(createData);
+    if (!result.success) {
+      return;
     }
+
+    setSuccess('Permiso asignado al rol correctamente');
+    handleCloseDialog();
   };
 
   const confirmDelete = async () => {
     if (!rolePermissionToDelete) return;
-    setError('');
+    setRolePermissionsError(null);
     setSuccess('');
-    const response = await rolePermissionsApi.delete(
+    const result = await deleteRolePermissionAsync(
       rolePermissionToDelete.roleId,
       rolePermissionToDelete.permissionId
     );
-    if (response.error) {
-      setError(response.error);
+    if (!result.success) {
       setDeleteDialogOpen(false);
       setRolePermissionToDelete(null);
-    } else {
-      setSuccess('Permiso de rol eliminado correctamente');
-      setDeleteDialogOpen(false);
-      setRolePermissionToDelete(null);
-      loadData();
+      return;
     }
+
+    setSuccess('Permiso de rol eliminado correctamente');
+    setDeleteDialogOpen(false);
+    setRolePermissionToDelete(null);
   };
+
+  const rolePermissions = state.rolePermissions;
+  const roles = state.roles;
+  const permissions = state.permissions;
+  const isLoading =
+    state.loading.rolePermissions ||
+    state.loading.roles ||
+    state.loading.permissions;
+  const error =
+    state.errors.rolePermissions ||
+    state.errors.roles ||
+    state.errors.permissions;
 
   const columns: GridColDef[] = [
     {
@@ -204,7 +201,15 @@ export default function RolePermissions() {
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => {
+            setRolePermissionsError(null);
+            setRolesError(null);
+            setPermissionsError(null);
+          }}
+        >
           {error}
         </Alert>
       )}

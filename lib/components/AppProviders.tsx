@@ -5,6 +5,7 @@ import { ThemeContextProvider } from './ThemeContext';
 import MuiThemeProvider from './MuiThemeProvider';
 import { AuthProvider } from '@/lib/contexts/AuthContext';
 import { DataProvider } from '@/lib/contexts/DataContext';
+import { HabitHiveProvider } from '@/lib/contexts/HabitHiveContext';
 import ProtectedRoute from './ProtectedRoute';
 import Navbar from './Navbar';
 import PageHeader from './PageHeader';
@@ -20,16 +21,18 @@ export default function AppProviders({ children }: AppProvidersProps) {
       <MuiThemeProvider>
         <AuthProvider>
           <DataProvider>
-            <ProtectedRoute>
-              <ThemeUpdater />
-              <div style={{ display: 'flex', minHeight: '100vh' }}>
-                <Navbar />
-                <main className="main-content">
-                  <PageHeader />
-                  {children}
-                </main>
-              </div>
-            </ProtectedRoute>
+            <HabitHiveProvider>
+              <ProtectedRoute>
+                <ThemeUpdater />
+                <div style={{ display: 'flex', minHeight: '100vh' }}>
+                  <Navbar />
+                  <main className="main-content">
+                    <PageHeader />
+                    {children}
+                  </main>
+                </div>
+              </ProtectedRoute>
+            </HabitHiveProvider>
           </DataProvider>
         </AuthProvider>
       </MuiThemeProvider>

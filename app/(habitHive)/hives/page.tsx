@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Box,
@@ -54,19 +54,16 @@ import {
   Public,
   Lock,
 } from '@mui/icons-material';
-import { hivesApi, Hive, CreateHiveDto, HiveStatus } from '@/lib/api/hives';
+import { Hive, CreateHiveDto, HiveStatus } from '@/lib/api/hives';
 import { habitHivesApi } from '@/lib/api/habitHives';
 import { hiveMembersApi, MemberRole } from '@/lib/api/hiveMembers';
-import { HabitType, Habit, habitsApi } from '@/lib/api/habits';
+import { HabitType } from '@/lib/api/habits';
 import { paymentsApi } from '@/lib/api/payments';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useHabitHive } from '@/lib/contexts/HabitHiveContext';
 
 export default function Hives() {
-  const [hives, setHives] = useState<Hive[]>([]);
-  const [filteredHives, setFilteredHives] = useState<Hive[]>([]);
-  const [habits, setHabits] = useState<Habit[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState('');
   const [success, setSuccess] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingHive, setEditingHive] = useState<Hive | null>(null);
@@ -92,32 +89,28 @@ export default function Hives() {
   const [selectedHabitIds, setSelectedHabitIds] = useState<string[]>([]);
 
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const {
+    state,
+    fetchHives,
+    fetchHabits,
+    createHiveAsync,
+    updateHiveAsync,
+    deleteHiveAsync,
+    setHivesError,
+    setHabitsError,
+  } = useHabitHive();
+  const hives = state.hives;
+  const habits = state.habits;
+  const isLoading = state.loading.hives;
+  const hivesError = state.errors.hives;
+  const habitsError = state.errors.habits;
+  const combinedContextError = hivesError || habitsError;
   const router = useRouter();
   const searchParams = useSearchParams();
   const [habitFilter, setHabitFilter] = useState<string>('all');
 
   const habitIdParam = searchParams.get('habitId');
   const activeHabitFilter = habitIdParam || habitFilter;
-
-  const loadHives = useCallback(async () => {
-    setIsLoading(true);
-    setError('');
-    const response = await hivesApi.getAll();
-    if (response.error) {
-      setError(response.error);
-    } else if (response.data) {
-      setHives(response.data);
-      setFilteredHives(response.data);
-    }
-    setIsLoading(false);
-  }, []);
-
-  const loadHabits = useCallback(async () => {
-    const response = await habitsApi.getAll();
-    if (response.data) {
-      setHabits(response.data);
-    }
-  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -128,13 +121,13 @@ export default function Hives() {
     }
 
     const timer = setTimeout(() => {
-      loadHives();
-      loadHabits();
+      fetchHives();
+      fetchHabits();
     }, 0);
     return () => clearTimeout(timer);
-  }, [isAuthenticated, authLoading, loadHives, loadHabits, router]);
+  }, [authLoading, fetchHabits, fetchHives, isAuthenticated, router]);
 
-  useEffect(() => {
+  const filteredHives = useMemo(() => {
     let filtered = hives;
 
     if (activeHabitFilter && activeHabitFilter !== 'all') {
@@ -155,9 +148,8 @@ export default function Hives() {
       filtered = filtered.filter(hive => hive.status === statusFilter);
     }
 
-    const t = setTimeout(() => setFilteredHives(filtered), 0);
-    return () => clearTimeout(t);
-  }, [searchTerm, statusFilter, activeHabitFilter, hives]);
+    return filtered;
+  }, [activeHabitFilter, hives, searchTerm, statusFilter]);
 
   const handleOpenDialog = (hive?: Hive) => {
     if (hive) {
@@ -201,32 +193,33 @@ export default function Hives() {
   };
 
   const handleSubmit = async () => {
-    setError('');
+    setLocalError('');
+    setHivesError(null);
     setSuccess('');
 
     if (editingHive) {
-      const response = await hivesApi.update(editingHive.id, formData);
-      if (response.error) {
-        setError(response.error);
-      } else {
-        setSuccess('Colmena actualizada correctamente');
-        handleCloseDialog();
-        loadHives();
-      }
-    } else {
-      if (!user?.id) {
-        setError('No se pudo identificar al usuario actual');
+      const result = await updateHiveAsync(editingHive.id, formData);
+      if (!result.success) {
         return;
       }
 
-      const response = await hivesApi.create({
+      setSuccess('Colmena actualizada correctamente');
+      handleCloseDialog();
+      fetchHives();
+    } else {
+      if (!user?.id) {
+        setLocalError('No se pudo identificar al usuario actual');
+        return;
+      }
+
+      const result = await createHiveAsync({
         ...formData,
         createdById: user.id,
       });
-      if (response.error) {
-        setError(response.error);
+      if (!result.success || !result.data) {
+        return;
       } else {
-        const createdHive = response.data;
+        const createdHive = result.data;
         let assignmentError = '';
         if (selectedHabitIds.length && createdHive) {
           const assignments = await Promise.all(
@@ -248,7 +241,7 @@ export default function Hives() {
         }
 
         if (assignmentError) {
-          setError(
+          setLocalError(
             `La colmena se creó, pero hubo problemas al asociar algunos hábitos: ${assignmentError}`
           );
         } else {
@@ -256,24 +249,25 @@ export default function Hives() {
         }
 
         handleCloseDialog();
-        loadHives();
+        fetchHives();
       }
     }
   };
 
   const confirmDelete = async () => {
     if (!hiveToDelete) return;
-    setError('');
+    setLocalError('');
+    setHivesError(null);
     setSuccess('');
-    const response = await hivesApi.delete(hiveToDelete.id);
-    if (response.error) {
-      setError(response.error);
-    } else {
-      setSuccess('Colmena eliminada correctamente');
-      setDeleteDialogOpen(false);
-      setHiveToDelete(null);
-      loadHives();
+    const result = await deleteHiveAsync(hiveToDelete.id);
+    if (!result.success) {
+      return;
     }
+
+    setSuccess('Colmena eliminada correctamente');
+    setDeleteDialogOpen(false);
+    setHiveToDelete(null);
+    fetchHives();
   };
 
   const [joinConfirmDialog, setJoinConfirmDialog] = useState(false);
@@ -282,25 +276,27 @@ export default function Hives() {
 
   const handleJoinHive = async () => {
     if (!user || !hiveToJoin) {
-      setError('Debes iniciar sesión para unirte a una colmena');
+      setLocalError('Debes iniciar sesión para unirte a una colmena');
       setJoinConfirmDialog(false);
       setHiveToJoin(null);
       return;
     }
 
-    setError('');
+    setLocalError('');
     setSuccess('');
 
     const isAlreadyMember = hiveToJoin.members?.some(m => m.userId === user.id);
     if (isAlreadyMember) {
-      setError('Ya eres miembro de esta colmena');
+      setLocalError('Ya eres miembro de esta colmena');
       setJoinConfirmDialog(false);
       setHiveToJoin(null);
       return;
     }
 
     if (!user.email) {
-      setError('No se encontró un correo electrónico válido para el usuario.');
+      setLocalError(
+        'No se encontró un correo electrónico válido para el usuario.'
+      );
       setJoinConfirmDialog(false);
       setHiveToJoin(null);
       return;
@@ -319,14 +315,14 @@ export default function Hives() {
 
       if (response.error) {
         if (response.status === 401 || response.status === 403) {
-          setError(
+          setLocalError(
             'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
           );
           setTimeout(() => {
             router.push('/login');
           }, 2000);
         } else {
-          setError(response.error);
+          setLocalError(response.error);
         }
         setJoinConfirmDialog(false);
         setHiveToJoin(null);
@@ -350,7 +346,7 @@ export default function Hives() {
         });
 
         if (paymentResponse.error || !paymentResponse.data) {
-          setError(
+          setLocalError(
             paymentResponse.error ||
               'No se pudo iniciar el pago. Intenta nuevamente.'
           );
@@ -383,7 +379,7 @@ export default function Hives() {
       setSuccess(joinMessage);
       setJoinConfirmDialog(false);
       setHiveToJoin(null);
-      loadHives();
+      fetchHives();
     } finally {
       setIsProcessingPayment(false);
     }
@@ -391,14 +387,14 @@ export default function Hives() {
 
   const promptJoinHive = (hive: Hive) => {
     if (!isAuthenticated || !user) {
-      setError('Debes iniciar sesión para unirte a una colmena');
+      setLocalError('Debes iniciar sesión para unirte a una colmena');
       router.push('/login');
       return;
     }
 
     const isAlreadyMember = hive.members?.some(m => m.userId === user.id);
     if (isAlreadyMember) {
-      setError('Ya eres miembro de esta colmena');
+      setLocalError('Ya eres miembro de esta colmena');
       return;
     }
 
@@ -494,7 +490,13 @@ export default function Hives() {
           </Typography>
         </Box>
         <Box>
-          <IconButton onClick={loadHives} sx={{ mr: 1 }}>
+          <IconButton
+            onClick={() => {
+              fetchHives();
+              fetchHabits();
+            }}
+            sx={{ mr: 1 }}
+          >
             <Refresh />
           </IconButton>
           <Button
@@ -507,9 +509,26 @@ export default function Hives() {
         </Box>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
+      {combinedContextError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => {
+            setHivesError(null);
+            setHabitsError(null);
+          }}
+        >
+          {combinedContextError}
+        </Alert>
+      )}
+
+      {localError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setLocalError('')}
+        >
+          {localError}
         </Alert>
       )}
 

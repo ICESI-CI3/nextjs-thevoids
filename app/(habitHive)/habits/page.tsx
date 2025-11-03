@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -39,19 +39,16 @@ import {
   Api,
 } from '@mui/icons-material';
 import {
-  habitsApi,
   Habit,
   CreateHabitDto,
   HabitType,
   EvidenceType,
 } from '@/lib/api/habits';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useHabitHive } from '@/lib/contexts/HabitHiveContext';
 
 export default function Habits() {
-  const [habits, setHabits] = useState<Habit[]>([]);
-  const [filteredHabits, setFilteredHabits] = useState<Habit[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState('');
   const [success, setSuccess] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
@@ -69,19 +66,17 @@ export default function Habits() {
 
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const router = useRouter();
-
-  const loadHabits = useCallback(async () => {
-    setIsLoading(true);
-    setError('');
-    const response = await habitsApi.getAll();
-    if (response.error) {
-      setError(response.error);
-    } else if (response.data) {
-      setHabits(response.data);
-      setFilteredHabits(response.data);
-    }
-    setIsLoading(false);
-  }, []);
+  const {
+    state,
+    fetchHabits,
+    createHabitAsync,
+    updateHabitAsync,
+    deleteHabitAsync,
+    setHabitsError,
+  } = useHabitHive();
+  const habits = state.habits;
+  const isLoading = state.loading.habits;
+  const contextError = state.errors.habits;
 
   useEffect(() => {
     if (authLoading) return; // Wait for auth to load
@@ -92,11 +87,11 @@ export default function Habits() {
     }
 
     // Load habits automatically when authenticated
-    const timer = setTimeout(() => loadHabits(), 0);
+    const timer = setTimeout(() => fetchHabits(), 0);
     return () => clearTimeout(timer);
-  }, [isAuthenticated, authLoading, loadHabits, router]);
+  }, [authLoading, fetchHabits, isAuthenticated, router]);
 
-  useEffect(() => {
+  const filteredHabits = useMemo(() => {
     let filtered = habits;
 
     if (searchTerm) {
@@ -115,9 +110,8 @@ export default function Habits() {
       );
     }
 
-    const t = setTimeout(() => setFilteredHabits(filtered), 0);
-    return () => clearTimeout(t);
-  }, [searchTerm, typeFilter, evidenceFilter, habits]);
+    return filtered;
+  }, [evidenceFilter, habits, searchTerm, typeFilter]);
 
   const handleOpenDialog = (habit?: Habit) => {
     if (habit) {
@@ -147,53 +141,50 @@ export default function Habits() {
   };
 
   const handleSubmit = async () => {
-    setError('');
+    setHabitsError(null);
     setSuccess('');
 
     if (!user) {
-      setError('Debes iniciar sesión para gestionar hábitos');
+      setLocalError('Debes iniciar sesión para gestionar hábitos');
       router.push('/login');
       return;
     }
 
     if (editingHabit) {
       const { ...updateData } = formData;
-      const response = await habitsApi.update(editingHabit.id, updateData);
-      if (response.error) {
-        setError(response.error);
-      } else {
-        setSuccess('Hábito actualizado correctamente');
-        handleCloseDialog();
-        loadHabits();
+      const result = await updateHabitAsync(editingHabit.id, updateData);
+      if (!result.success) {
+        return;
       }
+
+      setSuccess('Hábito actualizado correctamente');
+      handleCloseDialog();
     } else {
-      const response = await habitsApi.create({
+      const result = await createHabitAsync({
         ...formData,
         userId: user.id,
       });
-      if (response.error) {
-        setError(response.error);
-      } else {
-        setSuccess('Hábito creado correctamente');
-        handleCloseDialog();
-        loadHabits();
+      if (!result.success) {
+        return;
       }
+
+      setSuccess('Hábito creado correctamente');
+      handleCloseDialog();
     }
   };
 
   const confirmDelete = async () => {
     if (!habitToDelete) return;
-    setError('');
+    setHabitsError(null);
     setSuccess('');
-    const response = await habitsApi.delete(habitToDelete.id);
-    if (response.error) {
-      setError(response.error);
-    } else {
-      setSuccess('Hábito eliminado correctamente');
-      setDeleteDialogOpen(false);
-      setHabitToDelete(null);
-      loadHabits();
+    const result = await deleteHabitAsync(habitToDelete.id);
+    if (!result.success) {
+      return;
     }
+
+    setSuccess('Hábito eliminado correctamente');
+    setDeleteDialogOpen(false);
+    setHabitToDelete(null);
   };
 
   const handleViewHives = (habitId: string) => {
@@ -276,7 +267,7 @@ export default function Habits() {
           </Typography>
         </Box>
         <Box>
-          <IconButton onClick={loadHabits} sx={{ mr: 1 }}>
+          <IconButton onClick={() => fetchHabits()} sx={{ mr: 1 }}>
             <Refresh />
           </IconButton>
           <Button
@@ -289,9 +280,23 @@ export default function Habits() {
         </Box>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-          {error}
+      {contextError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setHabitsError(null)}
+        >
+          {contextError}
+        </Alert>
+      )}
+
+      {localError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setLocalError('')}
+        >
+          {localError}
         </Alert>
       )}
 

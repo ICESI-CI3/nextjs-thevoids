@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -28,23 +28,17 @@ import {
 import { Add, Edit, Delete, Refresh, Search, Group } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import {
-  hiveMembersApi,
   HiveMember,
   CreateHiveMemberDto,
   UpdateHiveMemberDto,
   MemberRole,
   MemberStatus,
 } from '@/lib/api/hiveMembers';
-import { hivesApi, Hive } from '@/lib/api/hives';
-import { usersApi, User } from '@/lib/api/users';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useHabitHive } from '@/lib/contexts/HabitHiveContext';
+import { useData } from '@/lib/contexts/DataContext';
 
 export default function HiveMembers() {
-  const [members, setMembers] = useState<HiveMember[]>([]);
-  const [hives, setHives] = useState<Hive[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingMember, setEditingMember] = useState<HiveMember | null>(null);
@@ -59,34 +53,30 @@ export default function HiveMembers() {
   });
 
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const {
+    state: habitState,
+    fetchHiveMembers,
+    fetchHives,
+    createHiveMemberAsync,
+    updateHiveMemberAsync,
+    deleteHiveMemberAsync,
+    setHiveMembersError,
+  } = useHabitHive();
+  const { state: dataState, fetchUsers, setUsersError } = useData();
   const hasLoadedRef = useRef(false);
   const router = useRouter();
 
-  const loadMembers = useCallback(async () => {
-    setIsLoading(true);
-    setError('');
-    const response = await hiveMembersApi.getAll();
-    if (response.error) {
-      setError(response.error);
-    } else if (response.data) {
-      setMembers(response.data);
-    }
-    setIsLoading(false);
-  }, []);
-
-  const loadHives = useCallback(async () => {
-    const response = await hivesApi.getAll();
-    if (response.data) {
-      setHives(response.data);
-    }
-  }, []);
-
-  const loadUsers = useCallback(async () => {
-    const response = await usersApi.getAll();
-    if (response.data) {
-      setUsers(response.data);
-    }
-  }, []);
+  const members = habitState.hiveMembers;
+  const hives = habitState.hives;
+  const users = dataState.users;
+  const isLoading =
+    habitState.loading.hiveMembers ||
+    habitState.loading.hives ||
+    dataState.loading.users;
+  const error =
+    habitState.errors.hiveMembers ||
+    habitState.errors.hives ||
+    dataState.errors.users;
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -98,13 +88,20 @@ export default function HiveMembers() {
       hasLoadedRef.current = true;
       // avoid calling setState synchronously inside effect
       const t = setTimeout(() => {
-        loadMembers();
-        loadHives();
-        loadUsers();
+        fetchHiveMembers();
+        fetchHives();
+        fetchUsers();
       }, 0);
       return () => clearTimeout(t);
     }
-  }, [isAuthenticated, authLoading, loadMembers, loadHives, loadUsers, router]);
+  }, [
+    authLoading,
+    fetchHiveMembers,
+    fetchHives,
+    fetchUsers,
+    isAuthenticated,
+    router,
+  ]);
 
   const handleOpenDialog = (member?: HiveMember) => {
     if (member) {
@@ -131,7 +128,8 @@ export default function HiveMembers() {
   };
 
   const handleSubmit = async () => {
-    setError('');
+    setHiveMembersError(null);
+    setUsersError(null);
     setSuccess('');
 
     if (editingMember) {
@@ -139,46 +137,40 @@ export default function HiveMembers() {
         role: formData.role,
       };
 
-      const response = await hiveMembersApi.update(
-        editingMember.id,
-        updateData
-      );
-      if (response.error) {
-        setError(response.error);
-      } else {
-        setSuccess('Miembro actualizado correctamente');
-        handleCloseDialog();
-        loadMembers();
+      const result = await updateHiveMemberAsync(editingMember.id, updateData);
+      if (!result.success) {
+        return;
       }
+
+      setSuccess('Miembro actualizado correctamente');
+      handleCloseDialog();
     } else {
       const createData: CreateHiveMemberDto = formData;
-      const response = await hiveMembersApi.create(createData);
-      if (response.error) {
-        setError(response.error);
-      } else {
-        setSuccess('Miembro agregado correctamente');
-        handleCloseDialog();
-        loadMembers();
+      const result = await createHiveMemberAsync(createData);
+      if (!result.success) {
+        return;
       }
+
+      setSuccess('Miembro agregado correctamente');
+      handleCloseDialog();
     }
   };
 
   const confirmDelete = async () => {
     if (!memberToDelete) return;
-    setError('');
+    setHiveMembersError(null);
     setSuccess('');
-    const response = await hiveMembersApi.delete(
+    const result = await deleteHiveMemberAsync(
       memberToDelete.hiveId,
       memberToDelete.userId
     );
-    if (response.error) {
-      setError(response.error);
-    } else {
-      setSuccess('Miembro eliminado correctamente');
-      setDeleteDialogOpen(false);
-      setMemberToDelete(null);
-      loadMembers();
+    if (!result.success) {
+      return;
     }
+
+    setSuccess('Miembro eliminado correctamente');
+    setDeleteDialogOpen(false);
+    setMemberToDelete(null);
   };
 
   const getRoleColor = (role: MemberRole) => {
@@ -341,7 +333,7 @@ export default function HiveMembers() {
           </Typography>
         </Box>
         <Box>
-          <IconButton onClick={loadMembers} sx={{ mr: 1 }}>
+          <IconButton onClick={() => fetchHiveMembers()} sx={{ mr: 1 }}>
             <Refresh />
           </IconButton>
           <Button
@@ -404,7 +396,14 @@ export default function HiveMembers() {
       </Grid>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => {
+            setHiveMembersError(null);
+            setUsersError(null);
+          }}
+        >
           {error}
         </Alert>
       )}

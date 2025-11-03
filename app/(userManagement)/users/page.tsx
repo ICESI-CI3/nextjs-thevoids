@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Button,
@@ -16,13 +16,11 @@ import {
 } from '@mui/material';
 import { Add, Edit, Delete, Refresh } from '@mui/icons-material';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
-import { usersApi, User, CreateUserDto, UpdateUserDto } from '@/lib/api/users';
+import { User, CreateUserDto, UpdateUserDto } from '@/lib/api/users';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useData } from '@/lib/contexts/DataContext';
 
 export default function Users() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -36,27 +34,26 @@ export default function Users() {
   });
 
   const { isAuthenticated } = useAuth();
+  const {
+    state,
+    fetchUsers,
+    createUserAsync,
+    updateUserAsync,
+    deleteUserAsync,
+    setUsersError,
+  } = useData();
   const hasLoadedRef = useRef(false);
 
-  const loadUsers = useCallback(async () => {
-    setIsLoading(true);
-    setError('');
-    const response = await usersApi.getAll();
-    if (response.error) {
-      setError(response.error);
-    } else if (response.data) {
-      setUsers(response.data);
-    }
-    setIsLoading(false);
-  }, []);
+  const users = state.users;
+  const isLoading = state.loading.users;
+  const error = state.errors.users;
 
   useEffect(() => {
     if (isAuthenticated && !hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadUsers();
+      fetchUsers();
     }
-  }, [isAuthenticated, loadUsers]);
+  }, [fetchUsers, isAuthenticated]);
 
   const handleOpenDialog = (user?: User) => {
     if (user) {
@@ -91,7 +88,7 @@ export default function Users() {
   };
 
   const handleSubmit = async () => {
-    setError('');
+    setUsersError(null);
     setSuccess('');
 
     if (editingUser) {
@@ -104,40 +101,37 @@ export default function Users() {
         updateData.password = formData.password;
       }
 
-      const response = await usersApi.update(editingUser.id, updateData);
-      if (response.error) {
-        setError(response.error);
-      } else {
-        setSuccess('Usuario actualizado correctamente');
-        handleCloseDialog();
-        loadUsers();
+      const result = await updateUserAsync(editingUser.id, updateData);
+      if (!result.success) {
+        return;
       }
+
+      setSuccess('Usuario actualizado correctamente');
+      handleCloseDialog();
     } else {
       const createData: CreateUserDto = formData;
-      const response = await usersApi.create(createData);
-      if (response.error) {
-        setError(response.error);
-      } else {
-        setSuccess('Usuario creado correctamente');
-        handleCloseDialog();
-        loadUsers();
+      const result = await createUserAsync(createData);
+      if (!result.success) {
+        return;
       }
+
+      setSuccess('Usuario creado correctamente');
+      handleCloseDialog();
     }
   };
 
   const confirmDelete = async () => {
     if (!userToDelete) return;
-    setError('');
+    setUsersError(null);
     setSuccess('');
-    const response = await usersApi.delete(userToDelete.id);
-    if (response.error) {
-      setError(response.error);
-    } else {
-      setSuccess('Usuario eliminado correctamente');
-      setDeleteDialogOpen(false);
-      setUserToDelete(null);
-      loadUsers();
+    const result = await deleteUserAsync(userToDelete.id);
+    if (!result.success) {
+      return;
     }
+
+    setSuccess('Usuario eliminado correctamente');
+    setDeleteDialogOpen(false);
+    setUserToDelete(null);
   };
 
   const columns: GridColDef[] = [
@@ -212,7 +206,7 @@ export default function Users() {
           Usuarios
         </Typography>
         <Box>
-          <IconButton onClick={loadUsers} sx={{ mr: 1 }}>
+          <IconButton onClick={() => fetchUsers()} sx={{ mr: 1 }}>
             <Refresh />
           </IconButton>
           <Button
@@ -226,7 +220,11 @@ export default function Users() {
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setUsersError(null)}
+        >
           {error}
         </Alert>
       )}
