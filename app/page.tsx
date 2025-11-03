@@ -18,14 +18,13 @@ import {
   AdminPanelSettings,
   Hive,
   Work,
-  PowerOffRounded,
   Loop,
   CreditCard,
   Receipt,
 } from '@mui/icons-material';
 
 export default function HomePage() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, hasPermission } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -41,6 +40,7 @@ export default function HomePage() {
       icon: <Person sx={{ fontSize: 60 }} />,
       path: '/users',
       color: '#10b981',
+      permission: 'READ_USERS',
     },
     {
       title: 'Roles',
@@ -48,6 +48,7 @@ export default function HomePage() {
       icon: <Badge sx={{ fontSize: 60 }} />,
       path: '/roles',
       color: '#3b82f6',
+      permission: 'READ_ROLES',
     },
     {
       title: 'Permisos',
@@ -55,6 +56,7 @@ export default function HomePage() {
       icon: <Lock sx={{ fontSize: 60 }} />,
       path: '/permissions',
       color: '#f59e0b',
+      permission: 'READ_PERMISSIONS',
     },
     {
       title: 'Permisos de Rol',
@@ -62,6 +64,7 @@ export default function HomePage() {
       icon: <AdminPanelSettings sx={{ fontSize: 60 }} />,
       path: '/rolePermissions',
       color: '#ec4899',
+      permission: 'READ_ROLE_PERMISSIONS',
     },
     {
       title: 'Colmenas',
@@ -69,6 +72,7 @@ export default function HomePage() {
       icon: <Hive sx={{ fontSize: 60 }} />,
       path: '/hives',
       color: '#10b981',
+      permission: 'READ_HIVES',
     },
     {
       title: 'Hábitos',
@@ -76,6 +80,7 @@ export default function HomePage() {
       icon: <Work sx={{ fontSize: 60 }} />,
       path: '/habits',
       color: '#ef4444',
+      permission: 'READ_HABITS',
     },
     {
       title: 'Progresos',
@@ -83,6 +88,7 @@ export default function HomePage() {
       icon: <Loop sx={{ fontSize: 60 }} />,
       path: '/progress',
       color: '#3b82f6',
+      permission: 'READ_PROGRESS',
     },
     {
       title: 'Pagos',
@@ -90,6 +96,7 @@ export default function HomePage() {
       icon: <CreditCard sx={{ fontSize: 60 }} />,
       path: '/payments',
       color: '#10b981',
+      permission: 'READ_TRANSACTIONS',
     },
     {
       title: 'Transacciones',
@@ -97,15 +104,14 @@ export default function HomePage() {
       icon: <Receipt sx={{ fontSize: 60 }} />,
       path: '/transactions',
       color: '#f59e0b',
-    },
-    {
-      title: 'Cerrar Sesión',
-      description: 'Salir de tu cuenta',
-      icon: <PowerOffRounded sx={{ fontSize: 60 }} />,
-      path: '/logout',
-      color: '#ef4444',
+      permission: 'READ_TRANSACTIONS',
     },
   ];
+
+  // Filter cards based on user permissions
+  const visibleCards = adminCards.filter(card =>
+    hasPermission(card.permission)
+  );
 
   return (
     <Box sx={{ p: 4 }}>
@@ -117,7 +123,7 @@ export default function HomePage() {
       </Typography>
 
       <Grid container spacing={3} sx={{ mt: 4 }}>
-        {adminCards.map(card => (
+        {visibleCards.map(card => (
           <Grid size={{ xs: 12, sm: 6, md: 4 }} key={card.path}>
             <Card
               sx={{

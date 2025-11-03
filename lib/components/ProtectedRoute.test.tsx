@@ -39,6 +39,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
+        hasPermission: jest.fn(() => true),
       });
 
       render(
@@ -54,6 +55,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: false,
         isLoading: false,
+        hasPermission: jest.fn(() => false),
       });
 
       render(
@@ -71,6 +73,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: false,
         isLoading: false,
+        hasPermission: jest.fn(() => false),
       });
       (usePathname as jest.Mock).mockReturnValue('/login');
 
@@ -90,6 +93,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: false,
         isLoading: true,
+        hasPermission: jest.fn(() => false),
       });
 
       render(
@@ -106,6 +110,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: false,
         isLoading: true,
+        hasPermission: jest.fn(() => false),
       });
 
       render(
@@ -121,6 +126,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: false,
         isLoading: true,
+        hasPermission: jest.fn(() => false),
       });
 
       render(
@@ -139,6 +145,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: false,
         isLoading: false,
+        hasPermission: jest.fn(() => false),
       });
       (usePathname as jest.Mock).mockReturnValue('/login');
 
@@ -158,6 +165,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: false,
         isLoading: false,
+        hasPermission: jest.fn(() => false),
       });
       (usePathname as jest.Mock).mockReturnValue('/users');
 
@@ -176,6 +184,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: false,
         isLoading: false,
+        hasPermission: jest.fn(() => false),
       });
       (usePathname as jest.Mock).mockReturnValue('/roles');
 
@@ -194,6 +203,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: false,
         isLoading: false,
+        hasPermission: jest.fn(() => false),
       });
       (usePathname as jest.Mock).mockReturnValue('/permissions');
 
@@ -214,6 +224,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: false,
         isLoading: false,
+        hasPermission: jest.fn(() => false),
       });
       (usePathname as jest.Mock).mockReturnValue('/users');
 
@@ -231,6 +242,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
+        hasPermission: jest.fn(() => true),
       });
 
       render(
@@ -258,6 +270,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
+        hasPermission: jest.fn(() => true),
       });
 
       rerender(
@@ -271,6 +284,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: false,
         isLoading: false,
+        hasPermission: jest.fn(() => false),
       });
 
       rerender(
@@ -288,6 +302,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: false,
         isLoading: false,
+        hasPermission: jest.fn(() => false),
       });
       (usePathname as jest.Mock).mockReturnValue('/users');
 
@@ -320,6 +335,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
+        hasPermission: jest.fn(() => true),
       });
       (usePathname as jest.Mock).mockReturnValue(undefined);
 
@@ -336,6 +352,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: false,
         isLoading: true,
+        hasPermission: jest.fn(() => false),
       });
 
       const { rerender } = render(
@@ -349,6 +366,7 @@ describe('ProtectedRoute', () => {
       (useAuth as jest.Mock).mockReturnValue({
         isAuthenticated: true,
         isLoading: false,
+        hasPermission: jest.fn(() => true),
       });
 
       rerender(
@@ -359,6 +377,129 @@ describe('ProtectedRoute', () => {
 
       expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
       expect(screen.getByText('Protected Content')).toBeInTheDocument();
+    });
+  });
+
+  describe('Permission-based Access Control', () => {
+    it('should allow access when user has required permission', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        hasPermission: jest.fn(permission => permission === 'READ_USERS'),
+      });
+      (usePathname as jest.Mock).mockReturnValue('/users');
+
+      render(
+        <ProtectedRoute>
+          <TestContent />
+        </ProtectedRoute>
+      );
+
+      expect(screen.getByText('Protected Content')).toBeInTheDocument();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('should redirect to home when user lacks required permission', async () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        hasPermission: jest.fn(() => false),
+      });
+      (usePathname as jest.Mock).mockReturnValue('/users');
+
+      render(
+        <ProtectedRoute>
+          <TestContent />
+        </ProtectedRoute>
+      );
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/');
+      });
+    });
+
+    it('should check permissions for /roles route', async () => {
+      const mockHasPermission = jest.fn(
+        permission => permission !== 'READ_ROLES'
+      );
+
+      (useAuth as jest.Mock).mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        hasPermission: mockHasPermission,
+      });
+      (usePathname as jest.Mock).mockReturnValue('/roles');
+
+      render(
+        <ProtectedRoute>
+          <TestContent />
+        </ProtectedRoute>
+      );
+
+      await waitFor(() => {
+        expect(mockHasPermission).toHaveBeenCalledWith('READ_ROLES');
+        expect(mockPush).toHaveBeenCalledWith('/');
+      });
+    });
+
+    it('should check permissions for /permissions route', async () => {
+      const mockHasPermission = jest.fn(
+        permission => permission !== 'READ_PERMISSIONS'
+      );
+
+      (useAuth as jest.Mock).mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        hasPermission: mockHasPermission,
+      });
+      (usePathname as jest.Mock).mockReturnValue('/permissions');
+
+      render(
+        <ProtectedRoute>
+          <TestContent />
+        </ProtectedRoute>
+      );
+
+      await waitFor(() => {
+        expect(mockHasPermission).toHaveBeenCalledWith('READ_PERMISSIONS');
+        expect(mockPush).toHaveBeenCalledWith('/');
+      });
+    });
+
+    it('should allow access to home page without specific permissions', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        hasPermission: jest.fn(() => false),
+      });
+      (usePathname as jest.Mock).mockReturnValue('/');
+
+      render(
+        <ProtectedRoute>
+          <TestContent />
+        </ProtectedRoute>
+      );
+
+      expect(screen.getByText('Protected Content')).toBeInTheDocument();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('should render null when user lacks permission', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        hasPermission: jest.fn(() => false),
+      });
+      (usePathname as jest.Mock).mockReturnValue('/habits');
+
+      const { container } = render(
+        <ProtectedRoute>
+          <TestContent />
+        </ProtectedRoute>
+      );
+
+      expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
+      expect(container.firstChild).toBeNull();
     });
   });
 });

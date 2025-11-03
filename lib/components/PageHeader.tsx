@@ -5,12 +5,16 @@ import { Typography, Box, Paper, IconButton } from '@mui/material';
 import { Brightness4, Brightness7 } from '@mui/icons-material';
 import { navItems } from './Navbar';
 import { useThemeContext } from './ThemeContext';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 export default function PageHeader() {
   const pathname = usePathname();
   const { mode, toggleTheme } = useThemeContext();
+  const { hasPermission } = useAuth();
 
-  const currentPage = navItems.find(item => item.href === pathname);
+  // Filter navItems by permission before finding current page
+  const allowedItems = navItems.filter(item => hasPermission(item.permission));
+  const currentPage = allowedItems.find(item => item.href === pathname);
   const pageTitle = currentPage?.label || 'HabitHive';
   const PageIcon = currentPage?.icon;
 

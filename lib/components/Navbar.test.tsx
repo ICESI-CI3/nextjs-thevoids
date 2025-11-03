@@ -73,6 +73,7 @@ describe('Navbar', () => {
       user: mockUser,
       logout: mockLogout,
       isAuthenticated: true,
+      hasPermission: jest.fn(() => true), // Mock hasPermission to return true by default
     });
   });
 
@@ -82,6 +83,7 @@ describe('Navbar', () => {
         user: null,
         logout: mockLogout,
         isAuthenticated: false,
+        hasPermission: jest.fn(() => false),
       });
 
       const { container } = render(<Navbar />);
@@ -182,8 +184,10 @@ describe('Navbar', () => {
         expect(item).toHaveProperty('href');
         expect(item).toHaveProperty('label');
         expect(item).toHaveProperty('icon');
+        expect(item).toHaveProperty('permission');
         expect(typeof item.href).toBe('string');
         expect(typeof item.label).toBe('string');
+        expect(typeof item.permission).toBe('string');
       });
     });
 
@@ -199,6 +203,65 @@ describe('Navbar', () => {
         const item = navItems.find(item => item.href === route);
         expect(item).toBeDefined();
       });
+    });
+  });
+
+  describe('Permission-based filtering', () => {
+    it('should filter navigation items based on permissions', () => {
+      const mockHasPermission = jest.fn(
+        (permission: string) =>
+          permission === 'READ_USERS' || permission === 'READ_ROLES'
+      );
+
+      (useAuth as jest.Mock).mockReturnValue({
+        user: mockUser,
+        logout: mockLogout,
+        isAuthenticated: true,
+        hasPermission: mockHasPermission,
+      });
+
+      render(<Navbar />);
+
+      // Should show items with allowed permissions
+      expect(screen.getByText('Users')).toBeInTheDocument();
+      expect(screen.getByText('Roles')).toBeInTheDocument();
+
+      // Should not show items without permissions
+      expect(screen.queryByText('Habits')).not.toBeInTheDocument();
+      expect(screen.queryByText('Permissions')).not.toBeInTheDocument();
+    });
+
+    it('should show all items when user has all permissions', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        user: mockUser,
+        logout: mockLogout,
+        isAuthenticated: true,
+        hasPermission: jest.fn(() => true),
+      });
+
+      render(<Navbar />);
+
+      navItems.forEach(item => {
+        expect(screen.getByText(item.label)).toBeInTheDocument();
+      });
+    });
+
+    it('should show no items when user has no permissions', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        user: mockUser,
+        logout: mockLogout,
+        isAuthenticated: true,
+        hasPermission: jest.fn(() => false),
+      });
+
+      render(<Navbar />);
+
+      navItems.forEach(item => {
+        expect(screen.queryByText(item.label)).not.toBeInTheDocument();
+      });
+
+      // But should still show logout button
+      expect(screen.getByText('Cerrar Sesión')).toBeInTheDocument();
     });
   });
 });

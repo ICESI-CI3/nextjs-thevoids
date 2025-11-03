@@ -24,33 +24,79 @@ import {
   AdminPanelSettings,
   Badge,
   Receipt,
-  Person,
   Logout,
+  Home,
 } from '@mui/icons-material';
 import { useThemeContext } from './ThemeContext';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
 export const navItems = [
-  { href: '/habits', label: 'Hábitos', icon: CheckCircleOutline },
-  { href: '/hives', label: 'Explorar Colmenas', icon: Hive },
-  { href: '/myHives', label: 'Mis Colmenas', icon: People },
-  { href: '/progress', label: 'Mi Progreso', icon: TrendingUp },
-  { href: '/payments', label: 'Pagos', icon: Payment },
-  { href: '/permissions', label: 'Permisos', icon: Lock },
+  {
+    href: '/habits',
+    label: 'Habits',
+    icon: CheckCircleOutline,
+    permission: 'READ_HABITS',
+  },
+  {
+    href: '/hives',
+    label: 'Hives',
+    icon: Hive,
+    permission: 'READ_HIVES',
+  },
+  {
+    href: '/myHives',
+    label: 'My Hives',
+    icon: Home,
+    permission: 'READ_HIVE_MEMBERS',
+  },
+  {
+    href: '/progress',
+    label: 'Progress',
+    icon: TrendingUp,
+    permission: 'READ_PROGRESS',
+  },
+  {
+    href: '/payments',
+    label: 'Payments',
+    icon: Payment,
+    permission: 'READ_TRANSACTIONS',
+  },
+  {
+    href: '/permissions',
+    label: 'Permissions',
+    icon: Lock,
+    permission: 'READ_PERMISSIONS',
+  },
   {
     href: '/rolePermissions',
-    label: 'Permisos de Roles',
+    label: 'Role Permissions',
     icon: AdminPanelSettings,
+    permission: 'READ_ROLE_PERMISSIONS',
   },
-  { href: '/roles', label: 'Roles', icon: Badge },
-  { href: '/transactions', label: 'Transacciones', icon: Receipt },
-  { href: '/users', label: 'Usuarios', icon: Person },
+  {
+    href: '/roles',
+    label: 'Roles',
+    icon: Badge,
+    permission: 'READ_ROLES',
+  },
+  {
+    href: '/transactions',
+    label: 'Transactions',
+    icon: Receipt,
+    permission: 'READ_TRANSACTIONS',
+  },
+  {
+    href: '/users',
+    label: 'Users',
+    icon: People,
+    permission: 'READ_USERS',
+  },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
   const { mode } = useThemeContext();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, hasPermission } = useAuth();
   const isDark = mode === 'dark';
 
   if (!isAuthenticated) {
@@ -113,43 +159,45 @@ export default function Navbar() {
         )}
         <Divider sx={{ mx: 2, borderColor: isDark ? '#2a2a2a' : '#d1fae5' }} />
         <List sx={{ px: 1, py: 2 }}>
-          {navItems.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname === href;
-            return (
-              <ListItem key={href} disablePadding sx={{ mb: 0.5 }}>
-                <ListItemButton
-                  component={Link}
-                  href={href}
-                  selected={isActive}
-                  sx={{
-                    py: 1.5,
-                    '&.Mui-selected': {
-                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                      borderLeft: '4px solid #10b981',
-                      '& .MuiListItemIcon-root': {
-                        color: '#059669',
+          {navItems
+            .filter(item => hasPermission(item.permission))
+            .map(({ href, label, icon: Icon }) => {
+              const isActive = pathname === href;
+              return (
+                <ListItem key={href} disablePadding sx={{ mb: 0.5 }}>
+                  <ListItemButton
+                    component={Link}
+                    href={href}
+                    selected={isActive}
+                    sx={{
+                      py: 1.5,
+                      '&.Mui-selected': {
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        borderLeft: '4px solid #10b981',
+                        '& .MuiListItemIcon-root': {
+                          color: '#059669',
+                        },
+                        '& .MuiListItemText-primary': {
+                          color: '#064e3b',
+                          fontWeight: 600,
+                        },
                       },
-                      '& .MuiListItemText-primary': {
-                        color: '#064e3b',
-                        fontWeight: 600,
-                      },
-                    },
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: 40, color: '#10b981' }}>
-                    <Icon />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={label}
-                    primaryTypographyProps={{
-                      fontSize: '0.95rem',
-                      color: 'text.primary',
                     }}
-                  />
-                </ListItemButton>
-              </ListItem>
-            );
-          })}
+                  >
+                    <ListItemIcon sx={{ minWidth: 40, color: '#10b981' }}>
+                      <Icon />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={label}
+                      primaryTypographyProps={{
+                        fontSize: '0.95rem',
+                        color: 'text.primary',
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              );
+            })}
         </List>
         <Box sx={{ px: 2, pb: 2 }}>
           <Button
