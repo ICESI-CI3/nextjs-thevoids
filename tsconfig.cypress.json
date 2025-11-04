@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["es2017", "dom"],
+    "types": ["cypress", "node"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": false,
+    "noEmit": true
+  },
+  "include": [
+    "tests/e2e/**/*.ts",
+    "cypress/**/*.ts",
+    "cypress.config.ts"
+  ],
+  "exclude": ["node_modules"]
+}

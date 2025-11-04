@@ -1,8 +1,19 @@
 {
   "stepDefinitions": [
-    "tests/e2e/**/*.ts",
-    "tests/e2e/step_definitions/**/*.ts"
+    "tests/e2e/step_definitions/**/*.{js,ts}",
+    "tests/e2e/step_definitions/*.{js,ts}"
   ],
   "filterSpecs": true,
-  "omitFiltered": true
+  "omitFiltered": true,
+  "messages": {
+    "enabled": true
+  },
+  "json": {
+    "enabled": true,
+    "output": "cypress/reports/cucumber-json/cucumber-report.json"
+  },
+  "html": {
+    "enabled": true,
+    "output": "cypress/reports/cucumber-html/index.html"
+  }
 }

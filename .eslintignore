@@ -37,3 +37,10 @@ logs/
 
 # Husky
 .husky/
+
+# Testing
+coverage/
+cypress/
+tests/
+*.config.ts
+*.config.js

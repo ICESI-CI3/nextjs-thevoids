@@ -13,6 +13,14 @@
 # testing
 /coverage
 
+# cypress
+cypress/videos
+cypress/screenshots
+cypress/downloads
+cypress/reports
+.cypress-cucumber-preprocessorrc.cache
+cypress.env.json
+
 # next.js
 /.next/
 /out/

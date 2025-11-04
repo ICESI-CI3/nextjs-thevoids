@@ -15,9 +15,15 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:e2e": "cypress open",
-    "test:e2e:headless": "start-server-and-test dev http://localhost:5173 cypress:run",
-    "cypress:run": "cypress run"
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run",
+    "cypress:run:electron": "cypress run --browser electron",
+    "test:e2e": "start-server-and-test dev http://localhost:5173 cypress:open",
+    "test:e2e:headless": "start-server-and-test dev http://localhost:5173 cypress:run:electron",
+    "test:e2e:smoke": "start-server-and-test dev http://localhost:5173 'cypress run --browser electron --spec tests/e2e/features/smoke.feature'"
+  },
+  "cypress-cucumber-preprocessor": {
+    "stepDefinitions": "tests/e2e/step_definitions/**/*.{js,ts}"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
