@@ -2,15 +2,65 @@
 
 Una plataforma moderna para gestionar hábitos, colmenas y más, construida con Next.js, TypeScript, Material-UI y Tailwind CSS.
 
+## Equipo TheVoids
+
+- Juan Manuel Marín Angarita (A00382037)
+- Cristian Eduardo Botina Carpio (A00395008)
+- Óscar Andrés Gómez Lozano (A00394142)
+
 ## 🚀 Tecnologías
 
-- **Framework**: Next.js 16 con App Router
+- **Framework**: Next.js
 - **Lenguaje**: TypeScript
 - **UI**: Material-UI (MUI) + Tailwind CSS
-- **Estado**: React Context
+- **Estado**: React Context API
 - **Testing**: Jest + React Testing Library + Cypress (E2E)
 - **Linting**: ESLint + Prettier
 - **Git Hooks**: Husky + lint-staged
+- **Deploy**: Railway con pipeline automatizado
+
+## 🤑 Funcionalidades Implementadas
+
+- **Dashboard administrativo**: vista resumen con accesos rápidos filtrados por permisos del usuario.
+  ![Dashboard](doc/images/image.png)
+
+- **Gestión de hábitos (HabitHive)**: CRUD para hábitos, colmenas, miembros, progresos, transacciones y pagos con tablas, formularios dinámicos y modales reutilizables.
+  ![Hábitos](doc/images/image-10.png)
+  ![Colmenas](doc/images/image-8.png)
+  ![Mis Colmenas](doc/images/image-9.png)
+  ![Pagos](doc/images/image-11.png)
+  ![Transacciones](doc/images/image-12.png)
+
+- **Gestión de usuarios**: módulos para usuarios, roles, permisos y asignaciones, cada uno con formularios basados en esquemas y tablas filtrables.
+  ![Users](doc/images/image-1.png)
+  ![Roles](doc/images/image-2.png)
+  ![Permisos](doc/images/image-3.png)
+  ![Permisos de Rol](doc/images/image-4.png)
+
+- **Flujo de autenticación**: pantalla de login con validaciones, manejo de errores y redirección según credenciales.
+  ![Login](doc/images/image-5.png)
+
+- **Protección de rutas y navegación dinámica**: Navbar, encabezados y tarjetas del dashboard ajustados a los permisos activos.
+  ![Navbar Limitada](doc/images/image-6.png)
+
+- **Tema y experiencia UI**: modo claro/oscuro persistente, gradientes personalizados y componentes responsivos.
+  ![Modo claro](doc/images/image-7.png)
+
+## 🔐 Autenticación y Autorización
+
+- **Login seguro**: `app/(userManagement)/login/page.tsx` consume `lib/api/auth.ts` para autenticar y almacenar token, datos de sesión y permisos en `AuthContext`.
+- **Verificación de permisos**: `AuthContext` expone `hasPermission`, utilizada por Navbar, PageHeader, tarjetas del dashboard y formularios para mostrar u ocultar acciones.
+- **Rutas protegidas**: `ProtectedRoute` mantiene un mapa de permisos mínimos; si el usuario no los cumple, lo redirige al inicio, evitando accesos directos por URL.
+- **UI dependiente de permisos**: los items de navegación y las cards del dashboard se filtran en tiempo real con base en los permisos vigentes, garantizando una experiencia personalizada.
+- **Pruebas automatizadas**: las suites Jest (`*.test.tsx`) cubren escenarios de autenticación y autorización, validando respuestas de UI ante distintos permisos simulados.
+
+## 🧠 Gestión del Estado
+
+- **Contextos globales**: `AuthContext` gestiona sesión y permisos, mientras `DataContext` centraliza catálogos y colecciones consumidas desde la API.
+- **Proveedores estructurados**: `AppProviders` y `MuiThemeProvider` envuelven la aplicación, exponiendo temas, autenticación y datos a cualquier componente.
+- **Sincronización con la API**: los contextos usan los clientes declarados en `lib/api` (basados en fetch tipado) para mantener datos frescos y consistentes.
+- **Formularios declarativos**: `FormBuilder` recibe configuraciones dinámicas y delega eventos al contexto, reduciendo duplicación en los módulos CRUD.
+- **Persistencia ligera**: la preferencia de tema utiliza `localStorage` y el estado de autenticación se mantiene en memoria para evitar exponer credenciales sensibles.
 
 ## 🛠️ Desarrollo
 
@@ -146,110 +196,25 @@ habithive/
 └── package.json                   # Dependencias y scripts
 ```
 
-## 🎨 Características de UI
-
-- **Tema Dinámico**: Modo claro/oscuro con persistencia
-- **Diseño Responsivo**: Optimizado para móvil y desktop
-- **Material Design**: Componentes consistentes con MUI
-- **Gradientes Modernos**: Tema verde personalizado
-- **Animaciones Suaves**: Transiciones y efectos hover
-
-## 🧪 Testing
-
-### Tests Unitarios (Jest + React Testing Library)
-
-El proyecto incluye tests unitarios completos con cobertura superior al 80% en todos los archivos.
-
-```bash
-# Ejecutar todos los tests
-npm run test
-
-# Modo watch (desarrollo)
-npm run test:watch
-
-# Generar reporte de cobertura
-npm run test:coverage
-```
-
 **Cobertura Actual:**
 
-- ✅ Statements: 97.72%
-- ✅ Branches: 91.1%
-- ✅ Functions: 88.8%
-- ✅ Lines: 97.72%
+- ✅ Statements: 93.85%
+- ✅ Branches: 82.12%
+- ✅ Functions: 80.88%
+- ✅ Lines: 93.85%
+
+![Tests](doc/images/image-13.png)
+![Coverage](doc/images/image-14.png)
 
 ### Tests End-to-End (Cypress + Cucumber)
 
-El proyecto incluye **42 escenarios E2E** que cubren todas las funcionalidades principales:
+El proyecto incluye **X escenarios E2E** que cubren todas las funcionalidades principales:
 
 **Features implementadas:**
 
-- ✅ Autenticación (4 escenarios)
-- ✅ Gestión de Usuarios (7 escenarios)
-- ✅ Gestión de Roles (7 escenarios)
-- ✅ Gestión de Permisos (6 escenarios)
-- ✅ Asignación de Permisos a Roles (6 escenarios)
-- ✅ Asignación de Roles a Usuarios (7 escenarios)
-
-**Ejecutar tests E2E:**
-
-```bash
-# Modo interactivo (recomendado para desarrollo)
-npm run test:e2e
-
-# Modo headless (para CI/CD)
-npm run test:e2e:headless
-
-# Con script helper
-.\run-e2e-tests.ps1
-```
-
-**Documentación E2E:**
-
-- 📖 [Guía Completa](tests/e2e/README.md)
-- 📊 [Resumen de Tests](tests/e2e/TEST_SUMMARY.md)
-- 🚀 [Guía Rápida](tests/e2e/QUICK_START.md)
-
-## 🔧 Calidad de Código
-
-### Linting y Formateo Automático
-
-Los commits automáticamente ejecutan:
-
-1. **ESLint**: Verifica reglas de código
-2. **Prettier**: Formatea el código
-3. **TypeScript**: Verifica tipos
-
-### Reglas Configuradas
-
-- **ESLint**: Reglas recomendadas de TypeScript + Next.js
-- **Prettier**: Configuración consistente (semicolons, single quotes, etc.)
-- **Husky**: Hooks de pre-commit y pre-push
-
-## 📝 Contribución
-
-1. Crea una rama desde `main`
-2. Realiza tus cambios
-3. Los commits ejecutarán automáticamente linting y formateo
-4. Crea un Pull Request
-
-## 📄 Licencia
-
-Este proyecto es privado y propiedad de ICESI-CI3.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- ✅ Autenticación (X escenarios)
+- ✅ Gestión de Usuarios (X escenarios)
+- ✅ Gestión de Roles (X escenarios)
+- ✅ Gestión de Permisos (X escenarios)
+- ✅ Asignación de Permisos a Roles (X escenarios)
+- ✅ Asignación de Roles a Usuarios (X escenarios)
