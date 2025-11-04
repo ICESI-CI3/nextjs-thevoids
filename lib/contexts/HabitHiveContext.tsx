@@ -407,7 +407,10 @@ export const HabitHiveProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         const response = await habitsApi.delete(id);
         if (response.error) {
-          const message = response.error || 'No se pudo eliminar el hábito';
+          const message =
+            response.status === 400
+              ? 'Error: Hay colmenas asociadas a este hábito'
+              : response.error || 'No se pudo eliminar el hábito';
           setHabitsError(message);
           return { success: false, error: message };
         }
