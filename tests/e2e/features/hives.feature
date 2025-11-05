@@ -3,8 +3,10 @@ Feature: Gestión de Colmenas
   Quiero gestionar colmenas
   Para poder crear y visualizar colmenas en la aplicación
 
-  Scenario: Visualizar interfaz de creación de colmena
+  Scenario: Crear una nueva colmena
     Given el usuario está autenticado
     When el usuario navega a la página de colmenas
     And el usuario hace clic en crear nueva colmena
-    Then el usuario debería ver el formulario de colmena
+    And el usuario completa el formulario de colmena con nombre "Mi Colmena E2E"
+    And el usuario envía el formulario de colmena
+    Then la colmena debería aparecer en la lista de colmenas
