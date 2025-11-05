@@ -1,6 +1,12 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -19,6 +25,7 @@ export function ThemeContextProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as ThemeMode;
     if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMode(savedTheme);
     }
   }, []);
