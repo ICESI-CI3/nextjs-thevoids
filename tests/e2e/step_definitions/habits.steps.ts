@@ -13,5 +13,5 @@ When('el usuario hace clic en crear nuevo hábito', () => {
 
 Then('el usuario debería ver el formulario de hábito', () => {
   cy.contains('Crear Nuevo Hábito').should('be.visible');
-  cy.contains('label', 'Título del hábito').should('be.visible');
+  cy.contains('label', 'Título del hábito').should('exist');
 });

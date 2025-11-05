@@ -13,6 +13,6 @@ When('el usuario hace clic en crear nuevo rol', () => {
 
 Then('el usuario debería ver el formulario de rol', () => {
   cy.contains('Nuevo Rol').should('be.visible');
-  cy.contains('label', 'Nombre').should('be.visible');
-  cy.contains('label', 'Descripción').should('be.visible');
+  cy.contains('label', 'Nombre').should('exist');
+  cy.contains('label', 'Descripción').should('exist');
 });

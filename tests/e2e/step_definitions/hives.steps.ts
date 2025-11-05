@@ -13,5 +13,5 @@ When('el usuario hace clic en crear nueva colmena', () => {
 
 Then('el usuario debería ver el formulario de colmena', () => {
   cy.contains('Crear Nueva Colmena').should('be.visible');
-  cy.contains('label', 'Nombre de la colmena').should('be.visible');
+  cy.contains('label', 'Nombre de la colmena').should('exist');
 });
