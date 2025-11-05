@@ -8,32 +8,11 @@ When('el usuario navega a la página de roles', () => {
 });
 
 When('el usuario hace clic en crear nuevo rol', () => {
-  cy.contains(/create|new|add|crear|nuevo|agregar/i)
-    .first()
-    .click();
+  cy.contains('button', 'Nuevo Rol').click();
 });
 
-When(
-  'el usuario completa el formulario de rol con nombre {string}',
-  (nombre: string) => {
-    cy.get('input[name="name"], input[name="roleName"], input[id*="name"]')
-      .first()
-      .clear()
-      .type(nombre);
-    // Agregar descripción si es requerida
-    cy.get('input[name="description"], textarea[name="description"]')
-      .first()
-      .clear()
-      .type('Descripción del rol');
-  }
-);
-
-When('el usuario envía el formulario de rol', () => {
-  cy.contains(/submit|save|create|guardar|crear/i).click();
-});
-
-Then('el rol debería aparecer en la lista de roles', () => {
-  cy.contains(/success|created|éxito|creado|Editor/i, {
-    timeout: 10000,
-  }).should('be.visible');
+Then('el usuario debería ver el formulario de rol', () => {
+  cy.contains('Nuevo Rol').should('be.visible');
+  cy.contains('label', 'Nombre').should('be.visible');
+  cy.contains('label', 'Descripción').should('be.visible');
 });

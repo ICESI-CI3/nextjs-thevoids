@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Box, CircularProgress } from '@mui/material';
@@ -32,6 +32,11 @@ export default function ProtectedRoute({
   const { isAuthenticated, isLoading, hasPermission } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !publicRoutes.includes(pathname)) {
@@ -49,6 +54,11 @@ export default function ProtectedRoute({
       }
     }
   }, [isAuthenticated, isLoading, pathname, router, hasPermission]);
+
+  // No renderizar nada hasta que esté montado en el cliente
+  if (!isMounted) {
+    return null;
+  }
 
   if (isLoading) {
     return (

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import AppProviders from '@/lib/components/AppProviders';
+import EmotionRegistry from '@/lib/components/EmotionRegistry';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -29,7 +30,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        <AppProviders>{children}</AppProviders>
+        <EmotionRegistry>
+          <AppProviders>{children}</AppProviders>
+        </EmotionRegistry>
       </body>
     </html>
   );

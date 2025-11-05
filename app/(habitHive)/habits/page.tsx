@@ -494,6 +494,7 @@ export default function Habits() {
             onChange={e => setFormData({ ...formData, title: e.target.value })}
             required
             helperText="Ej: Correr 5km, Leer 30 minutos, Meditar"
+            inputProps={{ 'data-testid': 'habit-title-input' }}
           />
           <FormControl fullWidth margin="dense">
             <InputLabel>Tipo de hábito</InputLabel>
@@ -503,6 +504,7 @@ export default function Habits() {
               onChange={e =>
                 setFormData({ ...formData, type: e.target.value as HabitType })
               }
+              data-testid="habit-type-select"
             >
               <MenuItem value={HabitType.OBJECTIVE}>
                 Objetivo - Verificable por datos
@@ -526,6 +528,7 @@ export default function Habits() {
                   evidenceType: e.target.value as EvidenceType,
                 })
               }
+              data-testid="habit-evidence-select"
             >
               <MenuItem value={EvidenceType.API}>
                 API - Integración automática
@@ -551,11 +554,16 @@ export default function Habits() {
               setFormData({ ...formData, frequency: e.target.value })
             }
             helperText="Ej: diaria, semanal, 3 veces por semana"
+            inputProps={{ 'data-testid': 'habit-frequency-input' }}
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancelar</Button>
-          <Button onClick={handleSubmit} variant="contained">
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            data-testid="save-habit-button"
+          >
             {editingHabit ? 'Actualizar' : 'Crear'}
           </Button>
         </DialogActions>

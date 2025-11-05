@@ -16,7 +16,7 @@ Given('el usuario está autenticado', () => {
 Given('el usuario está autenticado como administrador', () => {
   // Login como admin - ajustar credenciales según tu ambiente
   cy.visit('/login');
-  cy.get('input[name="email"]').clear().type('admin@habithive.com');
+  cy.get('input[name="email"]').clear().type('superadmin@habithive.com');
   cy.get('input[name="password"]').clear().type('Password123!');
   cy.get('button[type="submit"]').click();
   // Esperar a que se redirija del login

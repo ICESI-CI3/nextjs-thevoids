@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -12,16 +12,16 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeContextProvider({ children }: { children: ReactNode }) {
-  const [mode, setMode] = useState<ThemeMode>(() => {
-    // Inicializar con el tema guardado o 'light' por defecto
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('theme') as ThemeMode;
-      if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
-        return savedTheme;
-      }
+  // Siempre inicializar con 'light' para evitar hydration mismatch
+  const [mode, setMode] = useState<ThemeMode>('light');
+
+  // Leer localStorage solo DESPUÉS del montaje en el cliente
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as ThemeMode;
+    if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
+      setMode(savedTheme);
     }
-    return 'light';
-  });
+  }, []);
 
   const toggleTheme = () => {
     const newMode = mode === 'light' ? 'dark' : 'light';
