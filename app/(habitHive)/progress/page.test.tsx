@@ -252,10 +252,8 @@ describe('ProgressPage', () => {
     await screen.findByText('Morning Run');
 
     const evidenceLink = screen.getByRole('link', { name: /ver evidencia/i });
-    expect(evidenceLink).toHaveAttribute(
-      'href',
-      'http://localhost:3000/evidence/proof.png'
-    );
+    const expectedUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/evidence/proof.png`;
+    expect(evidenceLink).toHaveAttribute('href', expectedUrl);
 
     const completeButton = screen.getByRole('button', { name: /completar/i });
 

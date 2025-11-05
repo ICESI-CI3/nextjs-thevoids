@@ -1,6 +1,11 @@
 import { render } from '@testing-library/react';
 import RootLayout, { metadata } from './layout';
 
+// Mock next/navigation
+jest.mock('next/navigation', () => ({
+  useServerInsertedHTML: jest.fn(),
+}));
+
 // Mock AppProviders component
 jest.mock('@/lib/components/AppProviders', () => {
   return function MockAppProviders({
