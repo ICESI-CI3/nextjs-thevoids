@@ -274,6 +274,7 @@ export default function Habits() {
             variant="contained"
             startIcon={<Add />}
             onClick={() => handleOpenDialog()}
+            data-testid="create-habit-button"
           >
             Crear Hábito
           </Button>

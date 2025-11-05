@@ -9,6 +9,7 @@ Given('que la aplicación está funcionando', () => {
 
 When('visito la página principal', () => {
   cy.visit('/');
+  cy.waitForAppReady();
 });
 
 Then('la página debería cargar correctamente', () => {

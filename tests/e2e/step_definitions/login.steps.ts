@@ -4,6 +4,7 @@ import { Given, When, Then } from '@badeball/cypress-cucumber-preprocessor';
 
 Given('el usuario navega a la página de login', () => {
   cy.visit('/login');
+  cy.waitForAppReady();
 });
 
 When('el usuario ingresa el email {string}', (email: string) => {

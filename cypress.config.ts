@@ -8,6 +8,8 @@ export default defineConfig({
     baseUrl: 'http://localhost:5173',
     specPattern: 'tests/e2e/**/*.feature',
     supportFile: 'tests/e2e/support/e2e.ts',
+    defaultCommandTimeout: 10000,
+    retries: 1,
     async setupNodeEvents(
       on: Cypress.PluginEvents,
       config: Cypress.PluginConfigOptions

@@ -27,12 +27,22 @@ Cypress.Commands.add('clearSession', () => {
   cy.clearLocalStorage();
 });
 
+// Wait until the app finishes its initial loading (ProtectedRoute spinner gone)
+Cypress.Commands.add('waitForAppReady', () => {
+  // Reintenta hasta que el spinner/loader de ProtectedRoute desaparezca del DOM
+  cy.get('body', { timeout: 20000 }).should(
+    'not.have.descendants',
+    '[data-testid="loading-box"]'
+  );
+});
+
 declare global {
   namespace Cypress {
     interface Chainable {
       login(email: string, password: string): Chainable<void>;
       logout(): Chainable<void>;
       clearSession(): Chainable<void>;
+      waitForAppReady(): Chainable<void>;
     }
   }
 }
